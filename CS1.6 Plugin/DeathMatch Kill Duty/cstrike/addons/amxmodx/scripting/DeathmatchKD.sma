@@ -14,7 +14,7 @@
 #include <hamsandwich>
 
 #define PLUGIN	"Deathmatch: Kill Duty"
-#define VERSION	"3.0.9.1"
+#define VERSION	"3.0.9.2"
 #define AUTHOR	"HsK-Dev Blog By CCN"
 
 new const MAX_BPAMMO[] = { -1, 52, -1, 90, 1, 32, 1, 100, 90, 1, 120, 100, 100, 90, 90, 90, 100, 120,
@@ -282,7 +282,10 @@ LoadDMSettingFile()
 		}
 	}
 	if (file) fclose(file)
-
+	
+	if (g_StartTimeData < 5)
+		g_StartTimeData = 5;
+	
 	GetGameMap();
 	LoadSpawnPoint();
 }
@@ -430,23 +433,21 @@ public DM_BaseGameSetting()
 //==========================
 
 // Hud Msg ==================
-public dm_hud_msg(id)
+public dm_showHudMsg(id)
 {
 	if (!dm_game_play())
 		return;
 
-	new msg[256];
+	if (is_user_alive(id))
+		set_hudmessage(100, 100, 100, -1.0, 0.21, 0, 6.0, 999.0, 0.1, 0.2, -1);
+	else
+		set_hudmessage(100, 100, 100, 0.12, 0.21, 0, 6.0, 999.0, 0.1, 0.2, -1);
+	
+	if (!g_dmMode)
+		ShowSyncHudMsg(id, g_msgSync, "%L", LANG_PLAYER, "TEAM_KILL_MSG", g_CT_kill, g_TR_kill, g_MaxKill);
+	else
+		ShowSyncHudMsg(id, g_msgSync, " %L", id, "P_KILL_MSG", m_player_kill[id], g_MaxKill);
 
-	if (is_user_alive(id)) set_hudmessage(1, 1, 1, -1.0, 0.0, 2, 6.0, 999.0, 0.1, 0.2, -1) ;
-	else  set_hudmessage(1, 1, 1, 0.12, 0.21, 2, 6.0, 999.0, 0.1, 0.2, -1) ;
-
-	if (!g_dmMode) formatex(msg, sizeof msg - 1, "%L", LANG_PLAYER, "TEAM_KILL_MSG", g_CT_kill, g_TR_kill, g_MaxKill);
-	else formatex(msg, sizeof msg - 1, " %L", id, "P_KILL_MSG", m_player_kill[id], g_MaxKill);
-
-	ShowSyncHudMsg(id, g_msgSync, msg);
-	//show_hudmessage (id, msg);
-
-	set_task(2.0,"dm_hud_msg", id)
 }
 //=======================
 
@@ -535,7 +536,7 @@ public fw_PlayerKilled(victim, attacker, shouldgib)
 			if (g_CT_kill >= g_MaxKill || g_TR_kill >= g_MaxKill)
 			{
 				g_dm_play = false;
-				dm_game_end(fm_get_user_team(attacker), g_dmMode, dm_next_map());
+				dm_game_end(fm_get_user_team(attacker), dm_next_map());
 			}
 		}
 	}
@@ -549,7 +550,7 @@ public fw_PlayerKilled(victim, attacker, shouldgib)
 		if (m_player_kill[attacker] >= g_MaxKill)
 		{
 			g_dm_play = false;
-			dm_game_end(attacker, g_dmMode, dm_next_map());
+			dm_game_end(attacker, dm_next_map());
 		}
 	}
 
@@ -653,12 +654,10 @@ public event_round_start()
 	{
 		if (!is_user_connected(id) || !is_user_alive(id))
 			continue;
-
-		if (g_dmMode && g_ranspawn)
-		{
-			remove_task(id+TASK_ORIGIN_SET);
-			fm_set_user_origin(id+TASK_ORIGIN_SET, g_spawns[random_num(0, g_spawnCount - 1)]);
-		}
+			
+		m_player_kill[id] = 0;
+		remove_task(id+TASK_WEAP_M);
+		dm_menu_pri_weap(id+TASK_WEAP_M);
 	}
 }
 
@@ -671,6 +670,29 @@ public GameStartCountDown()
 		g_StartTime -= 1;
 		remove_task(TASK_MAKEGAME);
 		set_task(1.0, "GameStartCountDown", TASK_MAKEGAME);
+		
+		if (g_StartTime == 1)
+		{
+			for (new id = 1; id <= get_maxplayers(); id++)
+			{
+				if (!is_user_connected(id))
+					continue;
+
+				if (!is_user_alive(id))
+					continue;
+
+				set_msg_block(get_user_msgid("HideWeapon"), BLOCK_SET);
+				set_msg_block(get_user_msgid("RoundTime"), BLOCK_SET);
+				set_task(0.1, "event_hud_reset", id);
+				m_dead_fl[id] = false;
+					
+				if (g_dmMode && g_ranspawn)
+				{
+					remove_task(id+TASK_ORIGIN_SET);
+					fm_set_user_origin(id+TASK_ORIGIN_SET, g_spawns[random_num(0, g_spawnCount - 1)]);
+				}
+			}
+		}
 	}
 }
 
@@ -695,26 +717,6 @@ public logevent_round_start()
 		client_print(0, print_center, "%L", LANG_PLAYER, "PDM_GS_MSG", g_MaxKill);
 	}
 	g_dm_play = true
-
-	for (new id = 1; id <= get_maxplayers(); id++)
-	{
-		if (!is_user_connected(id))
-			continue;
-
-		m_player_kill[id] = 0;
-
-		remove_task(id+TASK_WEAP_M);
-		dm_menu_pri_weap(id+TASK_WEAP_M);
-
-		if (!is_user_alive(id))
-			continue;
-
-		set_msg_block(get_user_msgid("HideWeapon"), BLOCK_SET);
-		set_msg_block(get_user_msgid("RoundTime"), BLOCK_SET);
-		set_task(0.1, "event_hud_reset", id);
-		m_dead_fl[id] = false;
-		dm_hud_msg(id);
-	}
 }
 // =====================
 
@@ -786,17 +788,9 @@ public dm_weapon_meun_set(id, key)
 
 public dm_menu_pri_weap(taskid)
 {
-	if (!dm_game_play()) return;
-
 	new id = taskid - TASK_WEAP_M;
 
 	if (fm_get_user_team(id) != 1 && fm_get_user_team(id) != 2) return;
-
-	if (is_user_alive(id) && g_dmMode && g_ranspawn)
-	{
-		remove_task(id+TASK_ORIGIN_SET);
-		fm_set_user_origin(id+TASK_ORIGIN_SET, g_spawns[random_num(0, g_spawnCount - 1)]);
-	}
 
 	if (dm_user_tbot(id))
 	{
@@ -996,9 +990,6 @@ public dm_sec_weap_select(id, menu, item)
 
 public dm_user_spawn(taskid)
 {
-	if (!dm_game_play())
-		return;
-
 	new id = taskid - TASK_SPAWN;
 
 	new team = fm_get_user_team(id);
@@ -1006,6 +997,9 @@ public dm_user_spawn(taskid)
 
 	if (!is_user_alive(id))
 	{
+		if (!dm_game_play())
+			return;
+	
 		ExecuteHamB(Ham_CS_RoundRespawn, id);
 
 		if (g_PtTime != 0.0)
@@ -1088,22 +1082,22 @@ public dm_inev_res(args[])
 // ====================
 
 // Dm Game end ==================
-public dm_game_end(win_team, gamemod, next_map)
+public dm_game_end(win_team, next_map)
 {
 	new sound[256]; 
 
-	if (!gamemod)
+	if (!g_dmMode)
 	{
 		if (win_team == 1)
 		{
-			set_hudmessage(255,0,0, -1.0, 0.75, 1, 5.0, 20.0, 2.0, 1.0, -1);
-			ShowSyncHudMsg(0, g_msgSync, "%L", LANG_PLAYER, "TR_WIN_MSG", g_Nmap_name[next_map]);
+			set_hudmessage(255,0,0, -1.0, 0.75, 0, 5.0, 20.0, 2.0, 1.0, -1);
+			show_hudmessage(0, "%L", LANG_PLAYER, "TR_WIN_MSG", g_Nmap_name[next_map]);
 			copy(sound , charsmax(sound), "radio/terwin.wav");
 		}
 		else
 		{
-			set_hudmessage(0,0,255, -1.0, 0.75, 1, 5.0, 20.0, 2.0, 1.0, -1);
-			ShowSyncHudMsg(0, g_msgSync, "%L", LANG_PLAYER, "CT_WIN_MSG", g_Nmap_name[next_map]);
+			set_hudmessage(0,0,255, -1.0, 0.75, 0, 5.0, 20.0, 2.0, 1.0, -1);
+			show_hudmessage(0, "%L", LANG_PLAYER, "CT_WIN_MSG", g_Nmap_name[next_map]);
 			copy(sound , charsmax(sound), "radio/ctwin.wav");
 		}
 	}
@@ -1111,8 +1105,8 @@ public dm_game_end(win_team, gamemod, next_map)
 	{
 		new win_player[32];
 		get_user_name(win_team, win_player, 31);
-		set_hudmessage(174,120,121, -1.0, 0.75, 1, 6.0, 4.0, 1.0, 1.0, -1);
-		ShowSyncHudMsg(0, g_msgSync, "%L", LANG_PLAYER, "PL_WIN_MSG", win_player, g_Nmap_name[next_map]);
+		set_hudmessage(174,120,121, -1.0, 0.75, 0, 6.0, 4.0, 1.0, 1.0, -1);
+		show_hudmessage(0, "%L", LANG_PLAYER, "PL_WIN_MSG", win_player, g_Nmap_name[next_map]);
 
 		copy(sound , charsmax(sound), "player/betmenushow.wav");
 	}
@@ -1362,8 +1356,7 @@ public client_putinserver(id)
 {
 	m_player_kill[id] = 0;
 
-	if (dm_game_play())
-		dm_hud_msg(id);
+	set_task(1.0, "dm_showHudMsg", id, _, _, "b");
 	
 	if (dm_user_tbot(id))
 	{
