@@ -1,0 +1,66 @@
+"Phrases"
+{
+	"DM_KILLNUM"
+	{
+		"#format"		"{1:d},{2:d}"
+		"zho"			"殺數: {1} ^n 總殺數:{2}"
+	}
+
+	"DM_WIN"
+	{
+		"#format"		"{1:n},{2:s}"
+		"zho"			"勝利玩家:{1} | 下一張地圖:{2}"
+	}
+
+	"TDM_KILLNUM"
+	{
+		"#format"		"{1:d},{2:d},{3:d}"
+		"zho"			"反恐精英{1} | {2}恐怖份子 ^n 總殺數:{3}"
+	}
+
+	"TDM_WIN"
+	{
+		"#format"		"{1:d},{2:s}"
+		"zho"			"勝利隊伍:{1} | 下一張地圖:{2}"
+	}
+
+	"Weapon Menu"
+	{
+		"zho"			"[DM: KD-S] 選擇你的武器"
+	}
+
+	"Use New Weapon"
+	{
+		"zho"			"選擇新的武器"
+	}
+
+	"Use Last-Time Weapon"
+	{
+		"zho"			"選擇上回合的武器"
+	}
+
+	"Your Last Time Weapon"
+	{
+		"zho"			"上回合的武器是"
+	}
+
+	"Pri Weapon Menu"
+	{
+		"zho"			"[DM: KD-S] 選擇你的主武器"
+	}
+
+	"Sec Weapon Menu"
+	{
+		"zho"			"[DM: KD-S] 選擇你的副武器"
+	}
+
+	"Have not Spawn Origin In DM"
+	{
+		"zho"			"*** [DM ERROR] 本地圖沒有重生點, 因此遊戲模式改為團隊死鬥  ***"
+	}
+
+	"Debug Stuck"
+	{
+		"zho"			"*** [DM ERROR] 玩家卡著了... ***"
+	}
+}

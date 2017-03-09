@@ -1,0 +1,66 @@
+"Phrases"
+{
+	"DM_KILLNUM"
+	{
+		"#format"		"{1:d},{2:d}"
+		"en"			"Your Kill {1} ^n Max Kill{2}"
+	}
+
+	"DM_WIN"
+	{
+		"#format"		"{1:n},{2:s}"
+		"en"			"Win Player:{1} | Next Map:{2}"
+	}
+
+	"TDM_KILLNUM"
+	{
+		"#format"		"{1:d},{2:d},{3:d}"
+		"en"			"CT{1} | {2}TR ^n Max Kill{3}"
+	}
+
+	"TDM_WIN"
+	{
+		"#format"		"{1:d},{2:s}"
+		"en"			"Win Team:{1} | Next Map:{2}"
+	}
+
+	"Weapon Menu"
+	{
+		"en"			"[DM:KD-S] Weapon Menu"
+	}
+
+	"Use New Weapon"
+	{
+		"en"			"Use New Weapon"
+	}
+
+	"Use Last-Time Weapon"
+	{
+		"en"			"Use Last Time Weapon"
+	}
+
+	"Your Last Time Weapon"
+	{
+		"en"			"Your Last Time Weapon"
+	}
+
+	"Pri Weapon Menu"
+	{
+		"en"			"[DM:KD-S] Pri Weapon Menu"
+	}
+
+	"Sec Weapon Menu"
+	{
+		"en"			"[DM:KD-S] Sec Weapon Menu"
+	}
+
+	"Have not Spawn Origin In DM"
+	{
+		"en"			"*** [DM ERROR]Have not Spawn Origin, Game Mod Set to Team DM  ***"
+	}
+
+	"Debug Stuck"
+	{
+		"en"			"*** [DM ERROR] Player Stuck!! ***"
+	}
+}

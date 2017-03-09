@@ -1,0 +1,86 @@
+
+[en]
+TEAM_KILL_MSG = CT %d|%d TR /- MAX %d -/
+P_KILL_MSG = your kill %d /- MAX %d -/
+
+TR_WIN_MSG = !!TR WiN!! ^n Next Map is [%s]
+CT_WIN_MSG = !!CT WiN!! ^n Next Map is [%s]
+PL_WIN_MSG = !![%s] WiN!! ^n Next Map is [%s]
+
+TDM_GS_MSG = !!!Game StraT!!! TeaM MiX Kill IS: %d
+PDM_GS_MSG = !!!Game StraT!!! Player MiX Kill IS: %d
+
+INEV_RES_MSG = %.1f 's will spawn
+
+AGET_WEAP_MEUN1 = [DM: KD] Get Your Weap
+AGET_WEAP_MEUN2 = Get New Weap
+AGET_WEAP_MEUN3 = Use last time Weap
+
+AGET_WEAP_MEUN3_N = You has not last Time Weap
+
+PRI_WM_NAME = [DM: KD] Get your Pri Weap
+SEC_WM_NAME = [DM: KD] Get your Sec Weap
+
+MENU_BACK = Back
+MENU_NEXT = Next
+MENU_EXIT = Exit
+
+FREEZE_MSG = %d 's will strat game!
+
+TDM_KILLER_MSG = You Kill Player '%s', Your kill '%d' player
+DM_KILLER_MSG = You Kill Player '%s', Your kill '%d/%d' player
+DM_DEAD_MSG = Player '%s' kill you
+
+WILL_ADD_HP = [DM: KD] you in the buy zone, will add hp!
+WILL_NOT_ADD_HP = [DM: KD] you exit buy zone..
+ADD_HP_IN_BZN = [DM: KD] you in the buy zone %.1f 's, add %d hp!!
+
+ADMIN_SET_M1 = [DM: KD] Admin Set DM Game
+ADMIN_SET_M2 = Set New Spawns
+
+PDM_AIM_TEXT = Enemy
+
+ERROR_PDM = MAP[%s] have not spawns. this round is TDM Mod
+
+[tc]
+TEAM_KILL_MSG = CT %d|%d TR /- MAX %d -/
+P_KILL_MSG = your kill %d /- MAX %d -/
+
+TR_WIN_MSG = !!恐怖份子 勝利!! ^n 下一張地圖為 [%s]
+CT_WIN_MSG = !!反恐精英 勝利!! ^n 下一張地圖為 [%s]
+PL_WIN_MSG = !!玩家 [%s] 勝利!! ^n 下一張地圖為 [%s]
+
+TDM_GS_MSG = !!!遊戲開始!!! 團隊總殺數是 : %d
+PDM_GS_MSG = !!!遊戲開始!!! 個人總殺數是 : %d
+
+INEV_RES_MSG = %.1f 秒後張被強制復活
+
+AGET_WEAP_MEUN1 = [DM: KD] 選擇你的武器
+AGET_WEAP_MEUN2 = 選擇新的武器
+AGET_WEAP_MEUN3 = 選擇上回合的武器
+
+AGET_WEAP_MEUN3_N = 請先選擇新的武器
+
+PRI_WM_NAME = [DM: KD] 選擇你的主武器
+SEC_WM_NAME = [DM: KD] 選擇你的副武器
+
+MENU_BACK = 上一頁
+MENU_NEXT = 下一頁
+MENU_EXIT = 離開
+
+FREEZE_MSG = 遊戲在 %d 秒後開始
+
+TDM_KILLER_MSG = 你擊殺了玩家 '%s', 你共擊殺了 '%d' 位玩家
+DM_KILLER_MSG = 你擊殺了玩家 '%s', 你共擊殺了 '%d/%d' 位玩家
+DM_DEAD_MSG = 玩家 '%s' 擊殺了你
+
+WILL_ADD_HP = [DM: KD] 你在購買區, 張會補充血量!
+WILL_NOT_ADD_HP = [DM: KD] 你離開購買區...
+ADD_HP_IN_BZN = [DM: KD] 你在購買區 %.1f 秒, 補充 %d 血量!!
+
+ADMIN_SET_M1 = [DM: KD] DM: KD 管理
+ADMIN_SET_M2 = 設置目前位置為重新點
+
+PDM_AIM_TEXT = 敵人
+
+ERROR_PDM = 本地圖 [%s] 沒有重生點, 因此遊戲模式改為團隊死鬥
