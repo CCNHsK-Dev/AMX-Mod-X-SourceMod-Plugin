@@ -1,12 +1,12 @@
 
 DeathMatch:Kill Duty (DM:KD)
-                              By' HsK
+HsK-Dev Blog By CCN
 
-DeathMatch Plug-in for CS1.6 / CS:CZ
+DeathMatch Plug-in for Counter-Strike
 
 Need:
- -AMXX
- -CS1.6 / CS:CZ
+ - AMX Mod X
+ - Counter-Strike 1.6
 
 _____________________________
 Version: 3.0.1 (11/10/2015)
@@ -19,7 +19,7 @@ Version: 3.0.0 (1/4/2012)
  
 *****************************
 
-DM:KD function:
+DeathMatch:Kill Duty function:
  - DM/ TDM Mode
  - Round not end
  - Change your gun
@@ -32,7 +32,7 @@ DM:KD function:
 
 *****************************
 
-DM:KD Setting:
+DeathMatch:Kill Duty Setting:
  - cstrike\addons\amxmodx\configs\Dm_KD\DeathmatchKD_Setting.ini
      Game Setting
 

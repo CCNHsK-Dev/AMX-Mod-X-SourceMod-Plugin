@@ -1,16 +1,11 @@
 
 /* 
-			Deathmatch: Kill Duty  (DM:KD)
-
-					By ' CCN@HsK
-
-				13/11/2011 (Version: 3.0)
-				
-				
-			DeathMatch: Kill Duty - Fixed Upgrade 1  
-				11/10/2015 (Version: 3.0.1)
-				
-			http://hsk-game.blogspot.hk/
+			DeathMatch: Kill Duty - Upgrade 2
+				xx/3/2017 (Version: 3.1.0)
+			
+					HsK-Dev Blog By CCN
+			
+			http://ccnhsk-dev.blogspot.com/
 */
 
 #include <amxmodx>
@@ -19,8 +14,8 @@
 #include <hamsandwich>
 
 #define PLUGIN	"Deathmatch: Kill Duty"
-#define VERSION	"3.0.1"
-#define AUTHOR	"CCN@HsK"
+#define VERSION	"3.0.9.1"
+#define AUTHOR	"HsK-Dev Blog By CCN"
 
 new const MAX_BPAMMO[] = { -1, 52, -1, 90, 1, 32, 1, 100, 90, 1, 120, 100, 100, 90, 90, 90, 100, 120,
 			30, 120, 200, 32, 90, 120, 90, 2, 35, 90, 90, -1, 100 }
@@ -83,11 +78,10 @@ const OFFSET_SILENCER_FIREMODE = 74
 const ACCESS_FLAG = ADMIN_BAN
 
 // Game vars
-new dm_mod = -1; // DM MoD
+new g_dmMode = -1; // DM MoD
 new bool:g_dm_play; // DM Game
-new g_maxplayers; // Max player
 new g_MaxKill; // Max Kill
-new CT_kill, TR_kill; // CT and TR Kill [tdm]
+new g_CT_kill, g_TR_kill; // CT and TR Kill [tdm]
 new g_Nmap_NU, g_Nmap_name[256][32]; // Next Map
 new bool:g_ranspawn = false; // Ran Spawn mod
 new Float:g_spawns[128][3], g_spawnCount; // Ran Spawn set
@@ -98,20 +92,20 @@ new Float:g_ReDropWeaponTime; // Remove Dropped Weapon Time
 new bool:g_BlockSuicide; // Block player Suicide
 new bool:g_UnlimitAmmo; // Unlimited Ammo(Magazine)
 new bool:g_GGrenade[3]; // Give Grenade
-new Float:g_StratTime; // Game Strat Time (Freeze Time)
+new g_StartTimeData, g_StartTime; // Game Start Time (Freeze Time)
 new g_fwSpawn; // Spawn and forward handles
 new bool:g_BZAddHp, Float:g_BZAddHpTime, g_BZAddHpAmounT; // Buyzone Add hp setting
 new g_KEAddHp; // Kill Enemy Add HP (DM Mode)
 
 // Player vars
-new g_in_buyzone[33]; // Is Buy Zone
-new g_player_kill[33]; // Player Kill [pdm]
-new bool:g_chosen_pri_weap[33]; // Is Pri Weap set
-new g_pri_weaponid[33]; // Pri Weap id
-new bool:g_chosen_sec_weap[33]; // Is Sec Weap set
-new g_sec_weaponid[33]; // Sec Weap id
-new bool:g_dead_fl[33]; // Player Dead Perspective
-new bool:g_dmdamage[33] = false;  // DM Damage
+new m_in_buyzone[33]; // Is Buy Zone
+new m_player_kill[33]; // Player Kill [pdm]
+new bool:m_chosen_pri_weap[33]; // Is Pri Weap set
+new m_pri_weaponid[33]; // Pri Weap id
+new bool:m_chosen_sec_weap[33]; // Is Sec Weap set
+new m_sec_weaponid[33]; // Sec Weap id
+new bool:m_dead_fl[33]; // Player Dead Perspective
+new bool:m_dmdamage[33] = false;  // DM Damage
 
 // Weapons Menu
 new g_priweapon, g_secweapon, g_priweaponID[30], g_secweaponID[30], 
@@ -155,8 +149,8 @@ public plugin_init()
 	register_clcmd("buy", "clcmd_buy");
 	register_clcmd("chooseteam", "clcmd_changeteam");
 	register_clcmd("jointeam", "clcmd_changeteam");
-	register_clcmd("say dm_set", "dm_Game_Set_A");
-	register_clcmd("say /dm_set", "dm_Game_Set_A");
+	register_clcmd("say dm_set", "dm_adminSettingMenu");
+	register_clcmd("say /dm_set", "dm_adminSettingMenu");
 
 	register_message(get_user_msgid("RoundTime"), "message_RoundTime");
 	register_message(g_msgHideWeapon, "message_HideWeapon");
@@ -171,10 +165,9 @@ public plugin_init()
 	register_menu("UsE WeapoN MeuN", KEYSMENU, "dm_weapon_meun_set");
 	register_menu("Admin Menu 1", KEYSMENU, "dm_admin_meun_set");
 
-	load_dmini();
+	LoadDMSettingFile();
 
 	//MSG
-	g_maxplayers = get_maxplayers();
 	g_msgHideWeapon = get_user_msgid("HideWeapon");
 	g_msgCrosshair = get_user_msgid("Crosshair");
 	g_msgStatusText = get_user_msgid("StatusText");
@@ -183,14 +176,13 @@ public plugin_init()
 
 	register_dictionary("DeathmatchKD.txt");
 
-	// Z-bot [will use= =?]
 	cvar_botquota = get_cvar_pointer("bot_quota");
 }
 
-public plugin_cfg() DM_Game_SET()
+public plugin_cfg() DM_BaseGameSetting()
 
 // Dm Game ini load
-load_dmini()
+LoadDMSettingFile()
 {
 	g_bnweapon[0][0] = -1; g_bnweapon[0][1] = -1; g_bnweapon[0][2] = -1;
 	g_bnweapon[1][0] = -1; g_bnweapon[1][1] = -1; g_bnweapon[1][2] = -1;
@@ -229,9 +221,9 @@ load_dmini()
 
 				if (equal(key, "DM MoD"))
 				{
-					dm_mod = str_to_num(value);
+					g_dmMode = str_to_num(value);
 					
-					if (dm_mod == 0) register_cvar("HsK_Deathmatch_Plugin_load_SyPB", "0");
+					if (g_dmMode == 0) register_cvar("HsK_Deathmatch_Plugin_load_SyPB", "0");
 					else register_cvar("HsK_Deathmatch_Plugin_load_SyPB", "1"); 
 				}
 				else if (equal(key, "Player Respawn Time")) g_ReSTime = str_to_float(value);
@@ -252,11 +244,7 @@ load_dmini()
 						i++;
 					}
 				}
-				else if (equal(key, "Freeze Time"))
-				{
-					g_StratTime = str_to_float(value);
-					server_cmd("mp_freezetime %d", floatround(g_StratTime)+2);
-				}
+				else if (equal(key, "Freeze Time")) g_StartTimeData = str_to_num(value);
 				else if (equal(key, "Kill WiN")) g_MaxKill = str_to_num(value);
 				else if (equal(key, "Buyzone Add HP")) g_BZAddHp = str_to_bool(value);
 				else if (equal(key, "Buyzone Add HP Time")) g_BZAddHpTime = str_to_float(value);
@@ -295,12 +283,12 @@ load_dmini()
 	}
 	if (file) fclose(file)
 
-	GeT_MaPFile();
-	load_ranspawn();
+	GetGameMap();
+	LoadSpawnPoint();
 }
 
 // Random Spawns ============================
-public set_ranspawn(id)
+public SetSpawnPoint(id)
 {
 	new cfgdir[32], mapname[32], filepath[100], Float:origin[3], buffer[512], file;
 	get_configsdir(cfgdir, charsmax(cfgdir));
@@ -315,7 +303,7 @@ public set_ranspawn(id)
 
 	fclose(file);
 
-	dm_Game_Set_A(id);
+	dm_adminSettingMenu (id);
 
 	server_print("==========================");
 	server_print("= [Deathmatch: Kill Duty]     ");
@@ -324,7 +312,7 @@ public set_ranspawn(id)
 	client_print(id, print_chat, "New Spawn : %f %f %f", origin[0], origin[1], origin[2]);
 }
 
-stock load_ranspawn()
+stock LoadSpawnPoint()
 {
 	new cfgdir[32], mapname[32], filepath[100], linedata[64];
 	get_configsdir(cfgdir, charsmax(cfgdir));
@@ -367,7 +355,7 @@ stock load_ranspawn()
 //==============
 
 // Random Map ============
-public GeT_MaPFile()
+public GetGameMap()
 {
 	new path[64];
 	get_configsdir(path, charsmax(path));
@@ -396,7 +384,7 @@ public GeT_MaPFile()
 // =====================
 
 // Admin meun ==========
-public dm_Game_Set_A(id)
+public dm_adminSettingMenu(id)
 {
 	if ((get_user_flags(id) & ACCESS_FLAG))
 	{
@@ -417,26 +405,25 @@ public dm_admin_meun_set(id, key)
 {
 	switch (key)
 	{
-		case 0: set_ranspawn(id);
+		case 0: SetSpawnPoint(id);
 	}
 }
 //=====================
 
 //Set Dm mod and srever cmd... =========
-public DM_Game_SET()
+public DM_BaseGameSetting()
 {
-	if (dm_mod && !g_ranspawn)
+	if (g_dmMode && !g_ranspawn)
 	{
-		dm_mod = false;
+		g_dmMode = false;
 
 		new mapname[32]; get_mapname(mapname, charsmax(mapname));
 		server_print("%L", LANG_PLAYER, "ERROR_PDM", mapname);
 	}
 
-	if (!dm_mod) server_cmd("mp_friendlyfire 0");
+	if (!g_dmMode) server_cmd("mp_friendlyfire 0");
 	else server_cmd("mp_friendlyfire 1");
-	server_cmd("mp_freezetime %d", floatround(g_StratTime)+1);
-
+	
 	g_dm_play = false;
 }
 
@@ -453,8 +440,8 @@ public dm_hud_msg(id)
 	if (is_user_alive(id)) set_hudmessage(1, 1, 1, -1.0, 0.0, 2, 6.0, 999.0, 0.1, 0.2, -1) ;
 	else  set_hudmessage(1, 1, 1, 0.12, 0.21, 2, 6.0, 999.0, 0.1, 0.2, -1) ;
 
-	if (!dm_mod) formatex(msg, sizeof msg - 1, "%L", LANG_PLAYER, "TEAM_KILL_MSG", CT_kill, TR_kill, g_MaxKill);
-	else formatex(msg, sizeof msg - 1, " %L", id, "P_KILL_MSG", g_player_kill[id], g_MaxKill);
+	if (!g_dmMode) formatex(msg, sizeof msg - 1, "%L", LANG_PLAYER, "TEAM_KILL_MSG", g_CT_kill, g_TR_kill, g_MaxKill);
+	else formatex(msg, sizeof msg - 1, " %L", id, "P_KILL_MSG", m_player_kill[id], g_MaxKill);
 
 	ShowSyncHudMsg(id, g_msgSync, msg);
 	//show_hudmessage (id, msg);
@@ -533,22 +520,22 @@ public fw_PlayerKilled(victim, attacker, shouldgib)
 	get_user_name(attacker, killer_name, 31);
 	get_user_name(victim, victim_name, 31);
 	
-	g_player_kill[attacker] += 1;
+	m_player_kill[attacker] += 1;
 	client_print(victim, print_center,"%L", victim, "DM_DEAD_MSG", killer_name);
 	
-	if (!dm_mod)
+	if (!g_dmMode)
 	{
 		if (fm_get_user_team(victim) != fm_get_user_team(attacker))
 		{
-			if (fm_get_user_team(victim) == 1) CT_kill += 1;
-			else if (fm_get_user_team(victim) == 2) TR_kill += 1;
+			if (fm_get_user_team(victim) == 1) g_CT_kill += 1;
+			else if (fm_get_user_team(victim) == 2) g_TR_kill += 1;
 			
-			client_print(attacker, print_center,"%L", attacker, "TDM_KILLER_MSG", victim_name, g_player_kill[attacker]);
+			client_print(attacker, print_center,"%L", attacker, "TDM_KILLER_MSG", victim_name, m_player_kill[attacker]);
 
-			if (CT_kill >= g_MaxKill || TR_kill >= g_MaxKill)
+			if (g_CT_kill >= g_MaxKill || g_TR_kill >= g_MaxKill)
 			{
 				g_dm_play = false;
-				dm_game_end(fm_get_user_team(attacker), dm_mod, dm_next_map());
+				dm_game_end(fm_get_user_team(attacker), g_dmMode, dm_next_map());
 			}
 		}
 	}
@@ -557,12 +544,12 @@ public fw_PlayerKilled(victim, attacker, shouldgib)
 		if (g_KEAddHp > 0)
 			fm_set_user_health(attacker, min(fm_get_user_health(attacker) + g_KEAddHp, 100));
 			
-		client_print(attacker, print_center,"%L", attacker, "DM_KILLER_MSG", victim_name, g_player_kill[attacker], g_MaxKill);
+		client_print(attacker, print_center,"%L", attacker, "DM_KILLER_MSG", victim_name, m_player_kill[attacker], g_MaxKill);
 
-		if (g_player_kill[attacker] >= g_MaxKill)
+		if (m_player_kill[attacker] >= g_MaxKill)
 		{
 			g_dm_play = false;
-			dm_game_end(attacker, dm_mod, dm_next_map());
+			dm_game_end(attacker, g_dmMode, dm_next_map());
 		}
 	}
 
@@ -572,7 +559,7 @@ public fw_PlayerKilled(victim, attacker, shouldgib)
 public dead_flag(id)
 {
 	set_pev(id, pev_deadflag, 3);
-	g_dead_fl[id] = true;
+	m_dead_fl[id] = true;
 }
 
 public fw_TakeDamage(victim, inflictor, attacker, Float:damage, damage_type)
@@ -583,13 +570,13 @@ public fw_TakeDamage(victim, inflictor, attacker, Float:damage, damage_type)
 	if (victim == attacker)
 		return HAM_IGNORED;
 
-	if (fm_get_user_team(victim) == fm_get_user_team(attacker) && !dm_mod)
+	if (fm_get_user_team(victim) == fm_get_user_team(attacker) && !g_dmMode)
 		return HAM_SUPERCEDE;
 		
 	new Vteam = fm_get_user_team(victim);
-	if (Vteam == fm_get_user_team(attacker) && dm_mod)
+	if (Vteam == fm_get_user_team(attacker) && g_dmMode)
 	{
-		g_dmdamage[victim] = true;
+		m_dmdamage[victim] = true;
 
 		if (Vteam == 1) fm_set_user_team(victim, 2);
 		else if (Vteam == 2) fm_set_user_team(victim, 1);
@@ -600,14 +587,14 @@ public fw_TakeDamage(victim, inflictor, attacker, Float:damage, damage_type)
 
 public fw_TakeDamage_Post(victim)
 {
-	if (!g_dmdamage[victim])
+	if (!m_dmdamage[victim])
 		return;
 
 	new Vteam = fm_get_user_team(victim);
 	if (Vteam == 1) fm_set_user_team(victim, 2);
 	else if (Vteam == 2) fm_set_user_team(victim, 1);
 
-	g_dmdamage[victim] = false;
+	m_dmdamage[victim] = false;
 }
 // ================================== 
 //  Ham	End			    //
@@ -639,7 +626,7 @@ public fw_ClientKill()
 
 public fw_UpdateClientData(id, sendweapons, cd_handle)
 {
-	if (is_user_alive(id) || !g_dead_fl[id]) return FMRES_IGNORED;
+	if (is_user_alive(id) || !m_dead_fl[id]) return FMRES_IGNORED;
  
 	set_cd(cd_handle, CD_iUser1, get_gametime() + 0.007);  
 
@@ -653,22 +640,37 @@ public fw_UpdateClientData(id, sendweapons, cd_handle)
 public event_round_start()
 {
 	g_dm_play = false;
-	TR_kill = 0;
-	CT_kill = 0;
+	g_TR_kill = 0;
+	g_CT_kill = 0;
+	g_StartTime = g_StartTimeData;
+	
+	server_cmd("mp_freezetime %d", g_StartTimeData);
 
 	remove_task(TASK_MAKEGAME);
-	set_task(1.0, "Freeze_CountDowN", TASK_MAKEGAME);
+	set_task(0.0, "GameStartCountDown", TASK_MAKEGAME);
 
-	for (new id = 1; id <= g_maxplayers; id++)
+	for (new id = 1; id <= get_maxplayers(); id++)
 	{
 		if (!is_user_connected(id) || !is_user_alive(id))
 			continue;
 
-		if (dm_mod && g_ranspawn)
+		if (g_dmMode && g_ranspawn)
 		{
 			remove_task(id+TASK_ORIGIN_SET);
 			fm_set_user_origin(id+TASK_ORIGIN_SET, g_spawns[random_num(0, g_spawnCount - 1)]);
 		}
+	}
+}
+
+public GameStartCountDown()
+{
+	if (g_StartTime >= 1)
+	{
+		client_print(0, print_center,"%L", LANG_PLAYER, "FREEZE_MSG", g_StartTime);
+
+		g_StartTime -= 1;
+		remove_task(TASK_MAKEGAME);
+		set_task(1.0, "GameStartCountDown", TASK_MAKEGAME);
 	}
 }
 
@@ -677,15 +679,15 @@ public logevent_round_start()
 	new Players[32], iNum;
 	get_players(Players, iNum);
 
-	if (!dm_mod)
+	if (!g_dmMode)
 	{
 		if (g_MaxKill <= 0)
 			g_MaxKill = random_num(10, 15) * (iNum-1);
 
 		client_print(0, print_center, "%L", LANG_PLAYER, "TDM_GS_MSG", g_MaxKill);
 
-		TR_kill = 0;
-		CT_kill = 0;
+		g_TR_kill = 0;
+		g_CT_kill = 0;
 	}
 	else
 	{
@@ -694,12 +696,12 @@ public logevent_round_start()
 	}
 	g_dm_play = true
 
-	for (new id = 1; id <= g_maxplayers; id++)
+	for (new id = 1; id <= get_maxplayers(); id++)
 	{
 		if (!is_user_connected(id))
 			continue;
 
-		g_player_kill[id] = 0;
+		m_player_kill[id] = 0;
 
 		remove_task(id+TASK_WEAP_M);
 		dm_menu_pri_weap(id+TASK_WEAP_M);
@@ -710,20 +712,8 @@ public logevent_round_start()
 		set_msg_block(get_user_msgid("HideWeapon"), BLOCK_SET);
 		set_msg_block(get_user_msgid("RoundTime"), BLOCK_SET);
 		set_task(0.1, "event_hud_reset", id);
-		g_dead_fl[id] = false;
+		m_dead_fl[id] = false;
 		dm_hud_msg(id);
-	}
-}
-
-public Freeze_CountDowN()
-{
-	if (g_StratTime >= 1)
-	{
-		client_print(0, print_center,"%L", LANG_PLAYER, "FREEZE_MSG", floatround(g_StratTime-1.0));
-
-		g_StratTime -= 1.0;
-		remove_task(TASK_MAKEGAME);
-		set_task(1.0, "Freeze_CountDowN", TASK_MAKEGAME);
 	}
 }
 // =====================
@@ -761,7 +751,7 @@ public dm_menu_weap(taskid)
 		//len += formatex(menu[len], sizeof menu - 1 - len, "\r2.\w %L^n", id, "AGET_WEAP_MEUN3");
 		
 		// 3.0.1 - Fixed 
-		if (g_pri_weaponid[id] == 0 && g_sec_weaponid[id] == 0)
+		if (m_pri_weaponid[id] == 0 && m_sec_weaponid[id] == 0)
 			len += formatex(menu[len], sizeof menu - 1 - len, "\r2.\w %L^n", id, "AGET_WEAP_MEUN3_N");
 		else
 			len += formatex(menu[len], sizeof menu - 1 - len, "\r2.\w %L^n", id, "AGET_WEAP_MEUN3");
@@ -779,12 +769,12 @@ public dm_weapon_meun_set(id, key)
 		case 1:	
 		{
 			// 3.0.1 - Fixed 
-			if (g_pri_weaponid[id] == 0 && g_sec_weaponid[id] == 0)
+			if (m_pri_weaponid[id] == 0 && m_sec_weaponid[id] == 0)
 				set_task(0.1, "dm_menu_weap", id+TASK_WEAP_M);
 			else
 			{
-				g_chosen_pri_weap[id] = true;
-				g_chosen_sec_weap[id] = true;
+				m_chosen_pri_weap[id] = true;
+				m_chosen_sec_weap[id] = true;
 				remove_task(id+TASK_SPAWN);
 				dm_user_spawn(id+TASK_SPAWN);
 			}
@@ -802,7 +792,7 @@ public dm_menu_pri_weap(taskid)
 
 	if (fm_get_user_team(id) != 1 && fm_get_user_team(id) != 2) return;
 
-	if (is_user_alive(id) && dm_mod && g_ranspawn)
+	if (is_user_alive(id) && g_dmMode && g_ranspawn)
 	{
 		remove_task(id+TASK_ORIGIN_SET);
 		fm_set_user_origin(id+TASK_ORIGIN_SET, g_spawns[random_num(0, g_spawnCount - 1)]);
@@ -816,13 +806,13 @@ public dm_menu_pri_weap(taskid)
 		
 		if (weaponid && ((1<<weaponid) & PRIMARY_WEAPONS_BIT_SUM))
 		{
-			g_pri_weaponid[id] = weaponid;
-			g_chosen_pri_weap[id] = true;
+			m_pri_weaponid[id] = weaponid;
+			m_chosen_pri_weap[id] = true;
 		}
 		else
 		{
-			g_pri_weaponid[id] = 0;
-			g_chosen_pri_weap[id] = false;
+			m_pri_weaponid[id] = 0;
+			m_chosen_pri_weap[id] = false;
 		}
 
 		if (g_bnweapon[0][0] != -1 || g_bnweapon[0][1] != -1 || g_bnweapon[0][2] != -1)
@@ -830,8 +820,8 @@ public dm_menu_pri_weap(taskid)
 			random = random_num(0, 3);
 			if (random != 3 && g_bnweapon[0][random] != -1)
 			{
-				g_pri_weaponid[id] = random;
-				g_chosen_pri_weap[id] = true;
+				m_pri_weaponid[id] = random;
+				m_chosen_pri_weap[id] = true;
 			}
 		}
 		
@@ -888,13 +878,13 @@ public dm_pri_weap_select(id, menu, item)
 	
 	if (weaponid)
 	{
-		g_pri_weaponid[id] = weaponid;
-		g_chosen_pri_weap[id] = true;
+		m_pri_weaponid[id] = weaponid;
+		m_chosen_pri_weap[id] = true;
 	}
 	else
 	{
-		g_pri_weaponid[id] = 0;
-		g_chosen_pri_weap[id] = false;
+		m_pri_weaponid[id] = 0;
+		m_chosen_pri_weap[id] = false;
 	}
 	
 	dm_menu_sec_weap(id+TASK_WEAP_M);
@@ -918,13 +908,13 @@ public dm_menu_sec_weap(taskid)
 		
 		if (weaponid && ((1<<weaponid) & SECONDARY_WEAPONS_BIT_SUM))
 		{
-			g_sec_weaponid[id] = weaponid;
-			g_chosen_sec_weap[id] = true;
+			m_sec_weaponid[id] = weaponid;
+			m_chosen_sec_weap[id] = true;
 		}
 		else
 		{
-			g_sec_weaponid[id] = 0;
-			g_chosen_sec_weap[id] = false;
+			m_sec_weaponid[id] = 0;
+			m_chosen_sec_weap[id] = false;
 		}
 
 		if (g_bnweapon[1][0] != -1 || g_bnweapon[1][1] != -1 || g_bnweapon[1][2] != -1)
@@ -932,8 +922,8 @@ public dm_menu_sec_weap(taskid)
 			random = random_num(0, 3);
 			if (random != 3 && g_bnweapon[1][random] != -1)
 			{
-				g_sec_weaponid[id] = random;
-				g_chosen_sec_weap[id] = true;
+				m_sec_weaponid[id] = random;
+				m_chosen_sec_weap[id] = true;
 			}
 		}
 
@@ -987,13 +977,13 @@ public dm_sec_weap_select(id, menu, item)
 	
 	if (weaponid)
 	{
-		g_sec_weaponid[id] = weaponid;
-		g_chosen_sec_weap[id] = true;
+		m_sec_weaponid[id] = weaponid;
+		m_chosen_sec_weap[id] = true;
 	}
 	else
 	{
-		g_sec_weaponid[id] = 0;
-		g_chosen_sec_weap[id] = false;
+		m_sec_weaponid[id] = 0;
+		m_chosen_sec_weap[id] = false;
 	}
 	
 	remove_task(id+TASK_SPAWN);
@@ -1030,7 +1020,7 @@ public dm_user_spawn(taskid)
 			set_task(g_PtTime, "dm_protect_over", id);
 		}
 
-		if (dm_mod && g_ranspawn)
+		if (g_dmMode && g_ranspawn)
 		{
 			remove_task(id+TASK_ORIGIN_SET);
 			fm_set_user_origin(id+TASK_ORIGIN_SET, g_spawns[random_num(0, g_spawnCount - 1)]);
@@ -1045,32 +1035,32 @@ public dm_user_spawn(taskid)
 	set_msg_block(get_user_msgid("HideWeapon"), BLOCK_SET);
 	set_msg_block(get_user_msgid("RoundTime"), BLOCK_SET);
 	set_task(0.1, "event_hud_reset", id);
-	g_dead_fl[id] = false;
+	m_dead_fl[id] = false;
 
-	if (g_chosen_pri_weap[id] && g_pri_weaponid[id] != 0)
+	if (m_chosen_pri_weap[id] && m_pri_weaponid[id] != 0)
 	{
 		drop_weapons(id, 1);
 		
-		new weaponid = g_pri_weaponid[id];
+		new weaponid = m_pri_weaponid[id];
 		fm_give_item(id, WEAPON_CLASSNAME[weaponid]);
 		
 		while (fm_get_user_bpammo(id, weaponid) != MAX_BPAMMO[weaponid])
 			ExecuteHamB(Ham_GiveAmmo, id, BUY_AMMO[weaponid], AMMO_TYPE[weaponid], MAX_BPAMMO[weaponid]);
 
-		g_chosen_pri_weap[id] = false;
+		m_chosen_pri_weap[id] = false;
 	}
 	
-	if (g_chosen_sec_weap[id] && g_sec_weaponid[id] != 0)
+	if (m_chosen_sec_weap[id] && m_sec_weaponid[id] != 0)
 	{
 		drop_weapons(id, 2);
 		
-		new weaponid = g_sec_weaponid[id];
+		new weaponid = m_sec_weaponid[id];
 		fm_give_item(id, WEAPON_CLASSNAME[weaponid]);
 
 		while (fm_get_user_bpammo(id, weaponid) != MAX_BPAMMO[weaponid])
 			ExecuteHamB(Ham_GiveAmmo, id, BUY_AMMO[weaponid], AMMO_TYPE[weaponid], MAX_BPAMMO[weaponid]);
 		
-		g_chosen_sec_weap[id] = false;
+		m_chosen_sec_weap[id] = false;
 	}
 
 	if (g_GGrenade[0]) fm_give_item(id, "weapon_hegrenade");
@@ -1152,7 +1142,7 @@ public clcmd_changeteam(id)
 		
 	if ((get_user_flags(id) & ACCESS_FLAG)) // admin menu
 	{
-		dm_Game_Set_A(id);
+		dm_adminSettingMenu (id);
 		return PLUGIN_HANDLED;
 	}
 
@@ -1172,7 +1162,7 @@ public event_hud_reset(id)
 
 public event_ShowStatus(id)
 {
-	if (!dm_mod)
+	if (!g_dmMode)
 		return;
 
 	static text[100], magtext[100], i;
@@ -1215,7 +1205,7 @@ public event_ShowStatus(id)
 
 public event_HideStatus(id)
 {
-	if (dm_mod)
+	if (g_dmMode)
 	{
 		message_begin(MSG_ONE,g_msgStatusText,_,id);
 		write_byte(0);
@@ -1229,12 +1219,12 @@ public event_BuyZone(id)
 	if (!dm_game_play())
 		return;
 
-	g_in_buyzone[id] = read_data(1);
+	m_in_buyzone[id] = read_data(1);
 
-	if (dm_mod || !g_BZAddHp || !is_user_alive(id))
+	if (g_dmMode || !g_BZAddHp || !is_user_alive(id))
 		return;
 	
-	if (g_in_buyzone[id] && !task_exists(id+TASK_ADDHP))
+	if (m_in_buyzone[id] && !task_exists(id+TASK_ADDHP))
 	{
 		client_print(id, print_chat, "%L", id, "WILL_ADD_HP");
 
@@ -1242,7 +1232,7 @@ public event_BuyZone(id)
 		args[0] = id;
 		set_task(g_BZAddHpTime, "dm_buyzone_addhp", id+TASK_ADDHP, args, sizeof args, "b");
 	}
-	else if (!g_in_buyzone[id] && task_exists(id+TASK_ADDHP))
+	else if (!m_in_buyzone[id] && task_exists(id+TASK_ADDHP))
 	{
 		client_print(id, print_chat, "%L", id, "WILL_NOT_ADD_HP");
 		remove_task(id+TASK_ADDHP);
@@ -1265,7 +1255,7 @@ public dm_buyzone_addhp(args[])
 	new health, set_health;
 	health = fm_get_user_health(id);
 		
-	if (g_in_buyzone[id] && health < 100)
+	if (m_in_buyzone[id] && health < 100)
 	{
 		set_health = min(health + g_BZAddHpAmounT, 100);
 		fm_set_user_health(id, set_health);
@@ -1314,7 +1304,7 @@ public message_statusIcon(msg_id, msg_dest, id)
 
 public message_radar(msg_id, msg_dest, id)
 {
-	if (!dm_mod) return PLUGIN_CONTINUE;
+	if (!g_dmMode) return PLUGIN_CONTINUE;
 
 	return PLUGIN_HANDLED;
 }
@@ -1329,7 +1319,7 @@ public message_HideWeapon()
 
 public message_textmsg()
 {
-	if (!dm_mod)
+	if (!g_dmMode)
 		return PLUGIN_CONTINUE;
 
 	static textmsg[22];
@@ -1370,7 +1360,7 @@ public message_vgui_menu(msgid, dest, id)
 
 public client_putinserver(id)
 {
-	g_player_kill[id] = 0;
+	m_player_kill[id] = 0;
 
 	if (dm_game_play())
 		dm_hud_msg(id);
@@ -1434,7 +1424,7 @@ stock dm_force_team_join(id, menu_msgid, team[] = "5", class[] = "5")
 	set_msg_block(menu_msgid, msg_block);
 	dm_menu_pri_weap(id+TASK_WEAP_M);
 
-	if (is_user_alive(id) && dm_mod && g_ranspawn)
+	if (is_user_alive(id) && g_dmMode && g_ranspawn)
 	{
 		remove_task(id+TASK_ORIGIN_SET);
 		fm_set_user_origin(id+TASK_ORIGIN_SET, g_spawns[random_num(0, g_spawnCount - 1)]);
