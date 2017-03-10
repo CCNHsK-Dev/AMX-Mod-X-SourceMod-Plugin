@@ -14,7 +14,7 @@
 #include <hamsandwich>
 
 #define PLUGIN	"Deathmatch: Kill Duty"
-#define VERSION	"3.0.9.2"
+#define VERSION	"3.0.9.3"
 #define AUTHOR	"HsK-Dev Blog By CCN"
 
 new const MAX_BPAMMO[] = { -1, 52, -1, 90, 1, 32, 1, 100, 90, 1, 120, 100, 100, 90, 90, 90, 100, 120,
@@ -77,22 +77,31 @@ const OFFSET_SILENCER_FIREMODE = 74
 
 const ACCESS_FLAG = ADMIN_BAN
 
+#define MODE_TDM                0
+#define MODE_DM                 1
+
 // Game vars
-new g_dmMode = -1; // DM MoD
-new bool:g_dm_play; // DM Game
+new g_dmMode = MODE_TDM; // DM MoD
+new bool:g_dm_roundStart; // DM Game Start
+new bool:g_dm_roundEnd; // DM Game End
+
 new g_MaxKill; // Max Kill
 new g_CT_kill, g_TR_kill; // CT and TR Kill [tdm]
-new g_Nmap_NU, g_Nmap_name[256][32]; // Next Map
+new g_winIndex;
+
+new g_Nmap_NU, g_Nmap_name[256][32], g_nextRoundMap; // Next Map
+
 new bool:g_ranspawn = false; // Ran Spawn mod
-new Float:g_spawns[128][3], g_spawnCount; // Ran Spawn set
-new Float:g_ReSTime; // Player Respawn Time
-new Float:g_PtTime; // Player Protect Time
-new Float:g_InResTime; // Player Enforcement Respawn Time
-new Float:g_ReDropWeaponTime; // Remove Dropped Weapon Time
-new bool:g_BlockSuicide; // Block player Suicide
-new bool:g_UnlimitAmmo; // Unlimited Ammo(Magazine)
-new bool:g_GGrenade[3]; // Give Grenade
-new g_StartTimeData, g_StartTime; // Game Start Time (Freeze Time)
+new Float:g_spawnPoint[128][3], g_spawnCount; // Ran Spawn set
+new Float:g_spawnTime; // Player Respawn Time
+new Float:g_spawnGodTime; // Player Protect Time
+new Float:g_spawnMaxTime; // Player Enforcement Respawn Time
+new Float:g_weaponRemoveTime; // Remove Dropped Weapon Time
+
+new bool:g_blockSuicide; // Block player Suicide
+new bool:g_unlimitAmmo; // Unlimited Ammo(Magazine)
+new bool:g_giveGrenade[3]; // Give Grenade
+new g_startTimeData, g_startTime; // Game Start Time (Freeze Time)
 new g_fwSpawn; // Spawn and forward handles
 new bool:g_BZAddHp, Float:g_BZAddHpTime, g_BZAddHpAmounT; // Buyzone Add hp setting
 new g_KEAddHp; // Kill Enemy Add HP (DM Mode)
@@ -219,19 +228,13 @@ LoadDMSettingFile()
 				trim(key);
 				trim(value);
 
-				if (equal(key, "DM MoD"))
-				{
-					g_dmMode = str_to_num(value);
-					
-					if (g_dmMode == 0) register_cvar("HsK_Deathmatch_Plugin_load_SyPB", "0");
-					else register_cvar("HsK_Deathmatch_Plugin_load_SyPB", "1"); 
-				}
-				else if (equal(key, "Player Respawn Time")) g_ReSTime = str_to_float(value);
-				else if (equal(key, "Player Protect Time")) g_PtTime = str_to_float(value);
-				else if (equal(key, "Player Enforcement Respawn Time")) g_InResTime = str_to_float(value);
-				else if (equal(key, "Remove Dropped Weapon Time")) g_ReDropWeaponTime = str_to_float(value);
-				else if (equal(key, "Block Player Suicide")) g_BlockSuicide = str_to_bool(value);
-				else if (equal(key, "Unlimited Ammo")) g_UnlimitAmmo = str_to_bool(value);
+				if (equal(key, "DM MoD")) g_dmMode = str_to_num(value);
+				else if (equal(key, "Player Respawn Time")) g_spawnTime = str_to_float(value);
+				else if (equal(key, "Player Protect Time")) g_spawnGodTime = str_to_float(value);
+				else if (equal(key, "Player Enforcement Respawn Time")) g_spawnMaxTime = str_to_float(value);
+				else if (equal(key, "Remove Dropped Weapon Time")) g_weaponRemoveTime = str_to_float(value);
+				else if (equal(key, "Block Player Suicide")) g_blockSuicide = str_to_bool(value);
+				else if (equal(key, "Unlimited Ammo")) g_unlimitAmmo = str_to_bool(value);
 				else if (equal(key, "Give Grenade (hegrenade, flashbang, smokegrenade)"))
 				{
 					new i = 0;
@@ -240,11 +243,11 @@ LoadDMSettingFile()
 						trim(key);
 						trim(value);
 						
-						g_GGrenade[i] = str_to_bool(key);
+						g_giveGrenade[i] = str_to_bool(key);
 						i++;
 					}
 				}
-				else if (equal(key, "Freeze Time")) g_StartTimeData = str_to_num(value);
+				else if (equal(key, "Freeze Time")) g_startTimeData = str_to_num(value);
 				else if (equal(key, "Kill WiN")) g_MaxKill = str_to_num(value);
 				else if (equal(key, "Buyzone Add HP")) g_BZAddHp = str_to_bool(value);
 				else if (equal(key, "Buyzone Add HP Time")) g_BZAddHpTime = str_to_float(value);
@@ -283,8 +286,11 @@ LoadDMSettingFile()
 	}
 	if (file) fclose(file)
 	
-	if (g_StartTimeData < 5)
-		g_StartTimeData = 5;
+	if (g_dmMode != MODE_DM)
+		g_dmMode = MODE_TDM;
+	
+	if (g_startTimeData < 5)
+		g_startTimeData = 5;
 	
 	GetGameMap();
 	LoadSpawnPoint();
@@ -334,12 +340,12 @@ stock LoadSpawnPoint()
 
 			parse(linedata,data[0],5,data[1],5,data[2],5);
 
-			g_spawns[g_spawnCount][0] = str_to_float(data[0]);
-			g_spawns[g_spawnCount][1] = str_to_float(data[1]);
-			g_spawns[g_spawnCount][2] = str_to_float(data[2]);  //floatstr
+			g_spawnPoint[g_spawnCount][0] = str_to_float(data[0]);
+			g_spawnPoint[g_spawnCount][1] = str_to_float(data[1]);
+			g_spawnPoint[g_spawnCount][2] = str_to_float(data[2]);  //floatstr
 
 			g_spawnCount++;
-			if (g_spawnCount >= sizeof g_spawns)
+			if (g_spawnCount >= sizeof g_spawnPoint)
 				break;
 		}
 		if (file) fclose(file);
@@ -416,18 +422,19 @@ public dm_admin_meun_set(id, key)
 //Set Dm mod and srever cmd... =========
 public DM_BaseGameSetting()
 {
-	if (g_dmMode && !g_ranspawn)
+	if (g_dmMode == MODE_DM && !g_ranspawn)
 	{
-		g_dmMode = false;
+		g_dmMode = MODE_TDM;
 
 		new mapname[32]; get_mapname(mapname, charsmax(mapname));
 		server_print("%L", LANG_PLAYER, "ERROR_PDM", mapname);
 	}
 
-	if (!g_dmMode) server_cmd("mp_friendlyfire 0");
+	if (g_dmMode == MODE_TDM) server_cmd("mp_friendlyfire 0");
 	else server_cmd("mp_friendlyfire 1");
 	
-	g_dm_play = false;
+	g_dm_roundStart = false;
+	g_dm_roundEnd = false;
 }
 
 //==========================
@@ -435,18 +442,49 @@ public DM_BaseGameSetting()
 // Hud Msg ==================
 public dm_showHudMsg(id)
 {
-	if (!dm_game_play())
+	if (!g_dm_roundStart)
 		return;
 
-	if (is_user_alive(id))
-		set_hudmessage(100, 100, 100, -1.0, 0.21, 0, 6.0, 999.0, 0.1, 0.2, -1);
+	new hudMsg[256], msgPart;
+	msgPart = 0;
+		
+	if (g_dmMode == MODE_TDM)
+		msgPart += formatex(hudMsg[msgPart], sizeof hudMsg -1 - msgPart, "%L", LANG_PLAYER, "TEAM_KILL_MSG", g_CT_kill, g_TR_kill, g_MaxKill);
 	else
-		set_hudmessage(100, 100, 100, 0.12, 0.21, 0, 6.0, 999.0, 0.1, 0.2, -1);
+		msgPart += formatex(hudMsg[msgPart], sizeof hudMsg -1 - msgPart, " %L", id, "P_KILL_MSG", m_player_kill[id], g_MaxKill);
+		
+	if (g_dm_roundEnd)
+	{
+		if (g_dmMode == MODE_TDM)
+		{
+			if (g_winIndex == 1)
+			{
+				set_hudmessage(255,0,0, -1.0, 0.21, 0, 6.0, 999.0, 0.1, 0.2, -1);
+				msgPart += formatex(hudMsg[msgPart], sizeof hudMsg -1 - msgPart, "^n^n%L", LANG_PLAYER, "TR_WIN_MSG", g_Nmap_name[g_nextRoundMap]);
+			}
+			else
+			{
+				set_hudmessage(0,0,255, -1.0, 0.21, 0, 6.0, 999.0, 0.1, 0.2, -1);
+				msgPart += formatex(hudMsg[msgPart], sizeof hudMsg -1 - msgPart, "^n^n%L", LANG_PLAYER, "CT_WIN_MSG", g_Nmap_name[g_nextRoundMap]);
+			}
+		}
+		else
+		{
+			set_hudmessage(174,120,121, -1.0, 0.21, 0, 6.0, 999.0, 0.1, 0.2, -1);
+			new win_player[32];
+			get_user_name(g_winIndex, win_player, 31);
+			msgPart += formatex(hudMsg[msgPart], sizeof hudMsg -1 - msgPart, "^n^n%L", LANG_PLAYER, "PL_WIN_MSG", win_player, g_Nmap_name[g_nextRoundMap]);
+		}
+	}
+	else
+	{
+		if (is_user_alive(id))
+			set_hudmessage(100, 100, 100, -1.0, 0.21, 0, 6.0, 999.0, 0.1, 0.2, -1);
+		else
+			set_hudmessage(100, 100, 100, 0.12, 0.21, 0, 6.0, 999.0, 0.1, 0.2, -1);
+	}
 	
-	if (!g_dmMode)
-		ShowSyncHudMsg(id, g_msgSync, "%L", LANG_PLAYER, "TEAM_KILL_MSG", g_CT_kill, g_TR_kill, g_MaxKill);
-	else
-		ShowSyncHudMsg(id, g_msgSync, " %L", id, "P_KILL_MSG", m_player_kill[id], g_MaxKill);
+	ShowSyncHudMsg(id, g_msgSync, hudMsg);
 
 }
 //=======================
@@ -483,7 +521,7 @@ public fw_PlayerKilled(victim, attacker, shouldgib)
 	format(die_sounD, 31, "player/die%d.wav", random_num(1, 3));
 	emit_sound(victim, CHAN_BODY, die_sounD, 1.0, ATTN_NORM, 0, PITCH_NORM);
 
-	set_task(g_ReSTime, "dm_menu_weap", victim+TASK_WEAP_M);
+	set_task(g_spawnTime, "dm_menu_weap", victim+TASK_WEAP_M);
 
 	set_msg_block(get_user_msgid("HideWeapon"), BLOCK_SET);
 
@@ -524,7 +562,7 @@ public fw_PlayerKilled(victim, attacker, shouldgib)
 	m_player_kill[attacker] += 1;
 	client_print(victim, print_center,"%L", victim, "DM_DEAD_MSG", killer_name);
 	
-	if (!g_dmMode)
+	if (g_dmMode == MODE_TDM)
 	{
 		if (fm_get_user_team(victim) != fm_get_user_team(attacker))
 		{
@@ -535,8 +573,9 @@ public fw_PlayerKilled(victim, attacker, shouldgib)
 
 			if (g_CT_kill >= g_MaxKill || g_TR_kill >= g_MaxKill)
 			{
-				g_dm_play = false;
-				dm_game_end(fm_get_user_team(attacker), dm_next_map());
+				g_dm_roundEnd = true;
+				g_winIndex = fm_get_user_team (attacker);
+				dm_game_end();
 			}
 		}
 	}
@@ -549,8 +588,9 @@ public fw_PlayerKilled(victim, attacker, shouldgib)
 
 		if (m_player_kill[attacker] >= g_MaxKill)
 		{
-			g_dm_play = false;
-			dm_game_end(attacker, dm_next_map());
+			g_dm_roundEnd = true;
+			g_winIndex = attacker;
+			dm_game_end();
 		}
 	}
 
@@ -571,16 +611,18 @@ public fw_TakeDamage(victim, inflictor, attacker, Float:damage, damage_type)
 	if (victim == attacker)
 		return HAM_IGNORED;
 
-	if (fm_get_user_team(victim) == fm_get_user_team(attacker) && !g_dmMode)
+	new victimTeam = fm_get_user_team(victim);
+	new attackTeam = fm_get_user_team(attacker);
+		
+	if (g_dmMode == MODE_TDM && victimTeam == attackTeam)
 		return HAM_SUPERCEDE;
 		
-	new Vteam = fm_get_user_team(victim);
-	if (Vteam == fm_get_user_team(attacker) && g_dmMode)
+	if (victimTeam == attackTeam && g_dmMode)
 	{
 		m_dmdamage[victim] = true;
 
-		if (Vteam == 1) fm_set_user_team(victim, 2);
-		else if (Vteam == 2) fm_set_user_team(victim, 1);
+		if (victimTeam == 1) fm_set_user_team(victim, 2);
+		else if (victimTeam == 2) fm_set_user_team(victim, 1);
 	} 
 
 	return HAM_IGNORED;
@@ -609,19 +651,19 @@ public fw_SetModel(entity, const model[])
 	if (strlen(model) < 8)
 		return;
 	
-	if (g_ReDropWeaponTime > 0.0)
+	if (g_weaponRemoveTime > 0.0)
 	{
 		static classname[10];
 		pev(entity, pev_classname, classname, charsmax(classname));
 		
 		if (equal(classname, "weaponbox"))
-			set_pev(entity, pev_nextthink, get_gametime() + g_ReDropWeaponTime);
+			set_pev(entity, pev_nextthink, get_gametime() + g_weaponRemoveTime);
 	}
 }
 
 public fw_ClientKill()
 {
-	if (g_BlockSuicide) return FMRES_SUPERCEDE;
+	if (g_blockSuicide) return FMRES_SUPERCEDE;
 	return FMRES_IGNORED;
 }
 
@@ -640,12 +682,14 @@ public fw_UpdateClientData(id, sendweapons, cd_handle)
 // New Round ==================
 public event_round_start()
 {
-	g_dm_play = false;
+	g_dm_roundStart = false;
+	g_dm_roundEnd = false;
 	g_TR_kill = 0;
 	g_CT_kill = 0;
-	g_StartTime = g_StartTimeData;
+	g_startTime = g_startTimeData;
+	g_nextRoundMap = -1;
 	
-	server_cmd("mp_freezetime %d", g_StartTimeData);
+	server_cmd("mp_freezetime %d", g_startTimeData);
 
 	remove_task(TASK_MAKEGAME);
 	set_task(0.0, "GameStartCountDown", TASK_MAKEGAME);
@@ -663,15 +707,15 @@ public event_round_start()
 
 public GameStartCountDown()
 {
-	if (g_StartTime >= 1)
+	if (g_startTime >= 1)
 	{
-		client_print(0, print_center,"%L", LANG_PLAYER, "FREEZE_MSG", g_StartTime);
+		client_print(0, print_center,"%L", LANG_PLAYER, "FREEZE_MSG", g_startTime);
 
-		g_StartTime -= 1;
+		g_startTime -= 1;
 		remove_task(TASK_MAKEGAME);
 		set_task(1.0, "GameStartCountDown", TASK_MAKEGAME);
 		
-		if (g_StartTime == 1)
+		if (g_startTime == 1)
 		{
 			for (new id = 1; id <= get_maxplayers(); id++)
 			{
@@ -686,10 +730,10 @@ public GameStartCountDown()
 				set_task(0.1, "event_hud_reset", id);
 				m_dead_fl[id] = false;
 					
-				if (g_dmMode && g_ranspawn)
+				if (g_dmMode == MODE_DM && g_ranspawn)
 				{
 					remove_task(id+TASK_ORIGIN_SET);
-					fm_set_user_origin(id+TASK_ORIGIN_SET, g_spawns[random_num(0, g_spawnCount - 1)]);
+					fm_set_user_origin(id+TASK_ORIGIN_SET, g_spawnPoint[random_num(0, g_spawnCount - 1)]);
 				}
 			}
 		}
@@ -701,7 +745,7 @@ public logevent_round_start()
 	new Players[32], iNum;
 	get_players(Players, iNum);
 
-	if (!g_dmMode)
+	if (g_dmMode == MODE_TDM)
 	{
 		if (g_MaxKill <= 0)
 			g_MaxKill = random_num(10, 15) * (iNum-1);
@@ -716,7 +760,9 @@ public logevent_round_start()
 		if (g_MaxKill <= 0) g_MaxKill = random_num(4, 6) * (iNum-1);
 		client_print(0, print_center, "%L", LANG_PLAYER, "PDM_GS_MSG", g_MaxKill);
 	}
-	g_dm_play = true
+	g_dm_roundStart = true
+	g_dm_roundEnd = false;
+	g_winIndex = -1;
 }
 // =====================
 
@@ -734,8 +780,8 @@ public dm_menu_weap(taskid)
 	args[0] = id;
 	if (!task_exists(id+TASK_INEV_RES))
 	{
-		set_task(g_InResTime, "dm_inev_res", id+TASK_INEV_RES, args, sizeof args, "b");
-		client_print(id, print_center, "%L", id, "INEV_RES_MSG", g_InResTime);
+		set_task(g_spawnMaxTime, "dm_inev_res", id+TASK_INEV_RES, args, sizeof args, "b");
+		client_print(id, print_center, "%L", id, "INEV_RES_MSG", g_spawnMaxTime);
 	}
 
 	if (is_user_alive(id))
@@ -1002,7 +1048,7 @@ public dm_user_spawn(taskid)
 	
 		ExecuteHamB(Ham_CS_RoundRespawn, id);
 
-		if (g_PtTime != 0.0)
+		if (g_spawnGodTime > 0.0)
 		{
 			fm_set_user_godmode(id, 1);
 
@@ -1011,13 +1057,13 @@ public dm_user_spawn(taskid)
 			else if (team == 2)
 				fm_set_rendering(id, kRenderFxGlowShell, 0, 0, 255, kRenderNormal, 0);
 
-			set_task(g_PtTime, "dm_protect_over", id);
+			set_task(g_spawnGodTime, "dm_protect_over", id);
 		}
 
-		if (g_dmMode && g_ranspawn)
+		if (g_dmMode == MODE_DM && g_ranspawn)
 		{
 			remove_task(id+TASK_ORIGIN_SET);
-			fm_set_user_origin(id+TASK_ORIGIN_SET, g_spawns[random_num(0, g_spawnCount - 1)]);
+			fm_set_user_origin(id+TASK_ORIGIN_SET, g_spawnPoint[random_num(0, g_spawnCount - 1)]);
 		}
 	}
 
@@ -1057,9 +1103,9 @@ public dm_user_spawn(taskid)
 		m_chosen_sec_weap[id] = false;
 	}
 
-	if (g_GGrenade[0]) fm_give_item(id, "weapon_hegrenade");
-	if (g_GGrenade[1]) fm_give_item(id, "weapon_flashbang");
-	if (g_GGrenade[2]) fm_give_item(id, "weapon_smokegrenade");
+	if (g_giveGrenade[0]) fm_give_item(id, "weapon_hegrenade");
+	if (g_giveGrenade[1]) fm_give_item(id, "weapon_flashbang");
+	if (g_giveGrenade[2]) fm_give_item(id, "weapon_smokegrenade");
 
 	fm_set_user_armor(id, 100);
 }
@@ -1082,42 +1128,37 @@ public dm_inev_res(args[])
 // ====================
 
 // Dm Game end ==================
-public dm_game_end(win_team, next_map)
+public dm_game_end()
 {
-	new sound[256]; 
-
-	if (!g_dmMode)
+	g_nextRoundMap = -1;
+	while ( g_nextRoundMap == -1)
 	{
-		if (win_team == 1)
-		{
-			set_hudmessage(255,0,0, -1.0, 0.75, 0, 5.0, 20.0, 2.0, 1.0, -1);
-			show_hudmessage(0, "%L", LANG_PLAYER, "TR_WIN_MSG", g_Nmap_name[next_map]);
+		g_nextRoundMap = random_num(1, g_Nmap_NU);
+
+		new game_map[64];
+		format(game_map, charsmax(game_map), "maps/%s.bsp", g_Nmap_name[g_nextRoundMap]);
+		if (!file_exists(game_map))
+			g_nextRoundMap = -1;
+	}
+
+	new sound[256]; 
+	if (g_dmMode == MODE_TDM)
+	{
+		if (g_winIndex == 1)
 			copy(sound , charsmax(sound), "radio/terwin.wav");
-		}
 		else
-		{
-			set_hudmessage(0,0,255, -1.0, 0.75, 0, 5.0, 20.0, 2.0, 1.0, -1);
-			show_hudmessage(0, "%L", LANG_PLAYER, "CT_WIN_MSG", g_Nmap_name[next_map]);
 			copy(sound , charsmax(sound), "radio/ctwin.wav");
-		}
 	}
 	else
-	{
-		new win_player[32];
-		get_user_name(win_team, win_player, 31);
-		set_hudmessage(174,120,121, -1.0, 0.75, 0, 6.0, 4.0, 1.0, 1.0, -1);
-		show_hudmessage(0, "%L", LANG_PLAYER, "PL_WIN_MSG", win_player, g_Nmap_name[next_map]);
-
 		copy(sound , charsmax(sound), "player/betmenushow.wav");
-	}
 
 	client_cmd(0, "spk ^"%s^"", sound);
 
-	set_task(8.0, "change_map", next_map);
+	set_task(8.0, "change_map");
 }
 
-public change_map(next_map)
-	server_cmd("changelevel %s", g_Nmap_name[next_map]);
+public change_map()
+	server_cmd("changelevel %s", g_Nmap_name[g_nextRoundMap]);
 // ===========================
 
 public dm_protect_over(id)
@@ -1156,50 +1197,43 @@ public event_hud_reset(id)
 
 public event_ShowStatus(id)
 {
-	if (!g_dmMode)
+	if (g_dmMode == MODE_TDM)
 		return;
-
-	static text[100], magtext[100], i;
-	i = read_data(2);
-
+		
+	new i = read_data(2);
+	if (!is_user_alive(i) || !is_user_alive(id))
+		return;
+	
+	static text[100], magtext[100];
+	
 	formatex(text, sizeof text - 1, "%L", id, "PDM_AIM_TEXT");
 	add(text, sizeof text - 1, " : %p2 ");
 	format(magtext, 99, "%s", text);
 
-	if (is_user_alive(i) && is_user_alive(id))
-	{
-		message_begin(MSG_ONE,g_msgStatusText,_,id);
-		write_byte(0);
-		write_string(magtext);
-		message_end();
+	message_begin(MSG_ONE,g_msgStatusText,_,id);
+	write_byte(0);
+	write_string(magtext);
+	message_end();
+		
+	message_begin(MSG_ONE,g_magStatusValue,_,id);
+	write_byte(1);
+	write_short(1);
+	message_end();
 
-		message_begin(MSG_ONE,g_magStatusValue,_,id);
-		write_byte(1);
-		write_short(1);
-		message_end();
+	message_begin(MSG_ONE,g_magStatusValue,_,id);
+	write_byte(2);
+	write_short(i);
+	message_end();
 
-		message_begin(MSG_ONE,g_magStatusValue,_,id);
-		write_byte(2);
-		write_short(i);
-		message_end();
-
-		message_begin(MSG_ONE,g_magStatusValue,_,id);
-		write_byte(3);
-		write_short(fm_get_user_health(i));
-		message_end();
-	}
-	else 
-	{
-		message_begin(MSG_ONE,g_msgStatusText,_,id);
-		write_byte(0);
-		write_string("");
-		message_end();
-	}
+	message_begin(MSG_ONE,g_magStatusValue,_,id);
+	write_byte(3);
+	write_short(fm_get_user_health(i));
+	message_end();
 }
 
 public event_HideStatus(id)
 {
-	if (g_dmMode)
+	if (g_dmMode == MODE_DM)
 	{
 		message_begin(MSG_ONE,g_msgStatusText,_,id);
 		write_byte(0);
@@ -1215,7 +1249,7 @@ public event_BuyZone(id)
 
 	m_in_buyzone[id] = read_data(1);
 
-	if (g_dmMode || !g_BZAddHp || !is_user_alive(id))
+	if (g_dmMode == MODE_DM || !g_BZAddHp || !is_user_alive(id))
 		return;
 	
 	if (m_in_buyzone[id] && !task_exists(id+TASK_ADDHP))
@@ -1271,7 +1305,7 @@ public message_Money(msg_id, msg_dest, id)
 
 public message_AmmoX(msg_id, msg_dest, id)
 {
-	if (g_UnlimitAmmo == false || !is_user_alive(id))
+	if (g_unlimitAmmo == false || !is_user_alive(id))
 		return PLUGIN_CONTINUE;
 
 	if (get_msg_arg_int(1) >= sizeof AMMOID_WEAPON)
@@ -1298,7 +1332,7 @@ public message_statusIcon(msg_id, msg_dest, id)
 
 public message_radar(msg_id, msg_dest, id)
 {
-	if (!g_dmMode) return PLUGIN_CONTINUE;
+	if (g_dmMode == MODE_TDM) return PLUGIN_CONTINUE;
 
 	return PLUGIN_HANDLED;
 }
@@ -1313,7 +1347,7 @@ public message_HideWeapon()
 
 public message_textmsg()
 {
-	if (!g_dmMode)
+	if (g_dmMode == MODE_TDM)
 		return PLUGIN_CONTINUE;
 
 	static textmsg[22];
@@ -1417,10 +1451,10 @@ stock dm_force_team_join(id, menu_msgid, team[] = "5", class[] = "5")
 	set_msg_block(menu_msgid, msg_block);
 	dm_menu_pri_weap(id+TASK_WEAP_M);
 
-	if (is_user_alive(id) && g_dmMode && g_ranspawn)
+	if (is_user_alive(id) && g_dmMode == MODE_DM && g_ranspawn)
 	{
 		remove_task(id+TASK_ORIGIN_SET);
-		fm_set_user_origin(id+TASK_ORIGIN_SET, g_spawns[random_num(0, g_spawnCount - 1)]);
+		fm_set_user_origin(id+TASK_ORIGIN_SET, g_spawnPoint[random_num(0, g_spawnCount - 1)]);
 	}
 }
 
@@ -1667,7 +1701,7 @@ stock fm_set_user_origin(taskid, Float:origin[3])
 	if (!is_hull_vacant(origin, ((pev(id, pev_flags) & FL_DUCKING) ? HULL_HEAD : HULL_HUMAN)))
 	{
 		remove_task(id+TASK_ORIGIN_SET)
-		fm_set_user_origin(id+TASK_ORIGIN_SET, g_spawns[random_num(0, g_spawnCount - 1)])
+		fm_set_user_origin(id+TASK_ORIGIN_SET, g_spawnPoint[random_num(0, g_spawnCount - 1)])
 		return;
 	}
 
@@ -1676,7 +1710,7 @@ stock fm_set_user_origin(taskid, Float:origin[3])
 	if (is_player_stuck(id))
 	{
 		remove_task(id+TASK_ORIGIN_SET)
-		fm_set_user_origin(id+TASK_ORIGIN_SET, g_spawns[random_num(0, g_spawnCount - 1)])
+		fm_set_user_origin(id+TASK_ORIGIN_SET, g_spawnPoint[random_num(0, g_spawnCount - 1)])
 	}
 }
 
@@ -1770,7 +1804,7 @@ stock get_user_weapon_id(const weapon[])
 
 stock dm_game_play()
 {
-	return g_dm_play;
+	return (g_dm_roundStart && !g_dm_roundEnd);
 }
 
 stock dm_user_tbot(id)
@@ -1816,26 +1850,6 @@ stock bool:str_to_bool(value[])
 	if (equal(value, "1")) return true;
 
 	return false;
-}
-
-stock dm_next_map()
-{
-	new next_map = -1; //random_num(1, g_Nmap_NU);
-
-	while ( next_map == -1)
-	{
-		next_map = random_num(1, g_Nmap_NU);
-
-		new game_map[64];
-		format(game_map, charsmax(game_map), "maps/%s.bsp", g_Nmap_name[next_map]);
-		if (!file_exists(game_map))
-		{
-		//	server_print("Have not map: %s", g_Nmap_name[next_map]);
-			next_map = -1;
-		}
-	}
-
-	return next_map;
 }
 
 // SyPB/PodBot/YaPB & ZBot fixed
