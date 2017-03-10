@@ -14,7 +14,7 @@
 #include <hamsandwich>
 
 #define PLUGIN	"Deathmatch: Kill Duty"
-#define VERSION	"3.0.9.7"
+#define VERSION	"3.0.9.8"
 #define AUTHOR	"HsK-Dev Blog By CCN"
 
 new const MAX_BPAMMO[] = { -1, 52, -1, 90, 1, 32, 1, 100, 90, 1, 120, 100, 100, 90, 90, 90, 100, 120,
@@ -108,6 +108,7 @@ new bool:m_chosen_pri_weap[33]; // Is Pri Weap set
 new bool:m_chosen_sec_weap[33]; // Is Sec Weap set
 new m_pri_weaponid[33]; // Pri Weap id
 new m_sec_weaponid[33]; // Sec Weap id
+new bool:m_weaponSilen[33][2]; // Save M4A1 / USP Silen
 
 new bool:m_dead_fl[33]; // Player Dead Perspective
 new bool:m_dmdamage[33] = false;  // DM Damage
@@ -161,6 +162,13 @@ public plugin_init()
 	register_clcmd("say dm_set", "dm_adminSettingMenu");
 	register_clcmd("say /dm_set", "dm_adminSettingMenu");
 
+	//MSG
+	g_msgHideWeapon = get_user_msgid("HideWeapon");
+	g_msgCrosshair = get_user_msgid("Crosshair");
+	g_msgStatusText = get_user_msgid("StatusText");
+	g_magStatusValue = get_user_msgid("StatusValue");
+	g_msgSync = CreateHudSyncObj();
+	
 	register_message(get_user_msgid("RoundTime"), "message_RoundTime");
 	register_message(g_msgHideWeapon, "message_HideWeapon");
 	register_message(get_user_msgid("ShowMenu"), "message_show_menu");
@@ -175,13 +183,6 @@ public plugin_init()
 	register_menu("Admin Menu 1", KEYSMENU, "dm_admin_meun_set");
 
 	LoadDMSettingFile();
-
-	//MSG
-	g_msgHideWeapon = get_user_msgid("HideWeapon");
-	g_msgCrosshair = get_user_msgid("Crosshair");
-	g_msgStatusText = get_user_msgid("StatusText");
-	g_magStatusValue = get_user_msgid("StatusValue");
-	g_msgSync = CreateHudSyncObj();
 
 	register_dictionary("DeathmatchKD.txt");
 
@@ -518,14 +519,15 @@ public fw_PlayerKilled(victim, attacker, shouldgib)
 	format(die_sounD, 31, "player/die%d.wav", random_num(1, 3));
 	emit_sound(victim, CHAN_BODY, die_sounD, 1.0, ATTN_NORM, 0, PITCH_NORM);
 
-	m_spawnTime[victim] = get_gametime () + g_spawnTime;
+	GetWeaponSilen (victim);
+	m_spawnTime[victim] = get_gametime () + g_spawnTime;	
+	m_setDeadFlagTime[victim] = get_gametime () + 0.1;
 
 	set_msg_block(get_user_msgid("HideWeapon"), BLOCK_SET);
 
-	if (fm_get_user_defuse(victim)) fm_set_user_defuse(victim, 0);
+	if (fm_get_user_defuse(victim))
+		fm_set_user_defuse(victim, 0);
 	
-	m_setDeadFlagTime[victim] = get_gametime () + 0.1;
-
 	drop_weapons(victim, 0);
 	fm_strip_user_weapons(victim);
 
@@ -542,13 +544,12 @@ public fw_PlayerKilled(victim, attacker, shouldgib)
 		SendDeathMsg(attacker, victim, "worldspawn", 1);
 		return HAM_SUPERCEDE;
 	}
-	static weapon, hitzone, hs;
+	static weapon, hitzone;
 	get_user_attacker(victim, weapon, hitzone);
 	weapon = get_user_weapon(attacker);
-	if (hitzone == 1) hs = 1; else hs = 0;
 
 	set_pev(attacker, pev_frags, float(pev(attacker, pev_frags)+1));
-	SendDeathMsg(attacker, victim, weapon_msgname[weapon], hs);
+	SendDeathMsg(attacker, victim, weapon_msgname[weapon], hitzone);
 
 	// 3.0.1 - Add Msg
 	new killer_name[32], victim_name[32];
@@ -1096,7 +1097,15 @@ public dm_user_spawn(id)
 		
 		while (fm_get_user_bpammo(id, weaponid) != MAX_BPAMMO[weaponid])
 			ExecuteHamB(Ham_GiveAmmo, id, BUY_AMMO[weaponid], AMMO_TYPE[weaponid], MAX_BPAMMO[weaponid]);
-
+			
+		if (m_weaponSilen[id][0] && (1<<weaponid) & (1<<CSW_M4A1))
+		{
+			new class[32];
+			get_weaponname(weaponid, class, sizeof class - 1);
+			new weaponEntId = fm_find_ent_by_owner(-1, class, id);
+			set_pdata_int( weaponEntId, 74, (M4A1_SILENCED))
+		}
+			
 		m_chosen_pri_weap[id] = false;
 	}
 	
@@ -1109,6 +1118,14 @@ public dm_user_spawn(id)
 
 		while (fm_get_user_bpammo(id, weaponid) != MAX_BPAMMO[weaponid])
 			ExecuteHamB(Ham_GiveAmmo, id, BUY_AMMO[weaponid], AMMO_TYPE[weaponid], MAX_BPAMMO[weaponid]);
+		
+		if (m_weaponSilen[id][1] && (1<<weaponid) & (1<<CSW_USP))
+		{
+			new class[32];
+			get_weaponname(weaponid, class, sizeof class - 1);
+			new weaponEntId = fm_find_ent_by_owner(-1, class, id);
+			set_pdata_int( weaponEntId, 74, (USP_SILENCED))
+		}
 		
 		m_chosen_sec_weap[id] = false;
 	}
@@ -1163,6 +1180,31 @@ public dm_setSpawnPoint (id)
 	}
 
 	fm_set_user_origin (id, g_spawnPoint[spawnPoint]);
+}
+
+public GetWeaponSilen (id)
+{
+	static weapons[32], num, i, weaponid;
+	num = 0;
+	get_user_weapons(id, weapons, num);
+	
+	for (i = 0; i < num; i++)
+	{
+		weaponid = weapons[i]
+
+		if (((1<<weaponid) & (1<<CSW_M4A1)) || ((1<<weaponid) & (1<<CSW_USP)))
+		{
+			new class[32];
+			get_weaponname(weaponid, class, sizeof class - 1);
+			new weaponEntId = fm_find_ent_by_owner(-1, class, id);
+
+			new iWpnState = get_pdata_int( weaponEntId, 74 );
+			if (((1<<weaponid) & (1<<CSW_M4A1)))
+				m_weaponSilen[id][0] = (iWpnState == M4A1_SILENCED) ? true : false;
+			else if (((1<<weaponid) & (1<<CSW_USP)))
+				m_weaponSilen[id][1] = (iWpnState == USP_SILENCED) ? true : false;
+		}
+	}
 }
 // ====================
 
@@ -1581,7 +1623,6 @@ stock fm_give_item(index, const item[])
 stock fm_create_entity(const classname[])
 	return engfunc(EngFunc_CreateNamedEntity, engfunc(EngFunc_AllocString, classname))
 
-
 stock drop_weapons(id, dropwhat) // dropwhat: 1 = primary weapon , 2 = secondary weapon
 {
 	// Get user weapons
@@ -1682,6 +1723,19 @@ stock fm_get_user_bpammo(index, weapon)
 	}
 	
 	return get_pdata_int(index,offset);
+}
+
+stock fm_find_ent_by_owner(index, const classname[], owner, jghgtype = 0)
+{
+	new strtype[11] = "classname", ent = index;
+	switch (jghgtype) {
+		case 1: strtype = "target";
+		case 2: strtype = "targetname";
+	}
+
+	while ((ent = engfunc(EngFunc_FindEntityByString, ent, strtype, classname)) && pev(ent, pev_owner) != owner) {}
+
+	return ent;
 }
 
 stock fm_set_user_origin(id, Float:origin[3])
