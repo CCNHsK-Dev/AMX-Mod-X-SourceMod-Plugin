@@ -14,7 +14,7 @@
 #include <hamsandwich>
 
 #define PLUGIN	"Deathmatch: Kill Duty"
-#define VERSION	"3.0.9.6"
+#define VERSION	"3.0.9.7"
 #define AUTHOR	"HsK-Dev Blog By CCN"
 
 new const MAX_BPAMMO[] = { -1, 52, -1, 90, 1, 32, 1, 100, 90, 1, 120, 100, 100, 90, 90, 90, 100, 120,
@@ -260,10 +260,10 @@ LoadDMSettingFile()
 				g_priweaponID[g_priweapon] = get_user_weapon_id(weaponid);
 				g_priweaponN[g_priweapon] = weaponname;
 
-				if (equal(g_priweaponID[g_priweapon], "weapon_ak47")) g_bnweapon[0][0] = g_priweapon;
-				else if (equal(g_priweaponID[g_priweapon], "weapon_m4a1")) g_bnweapon[0][1] = g_priweapon;
-				else if (equal(g_priweaponID[g_priweapon], "weapon_awp")) g_bnweapon[0][2] = g_priweapon;
-
+				if (g_priweaponID[g_priweapon] == CSW_AK47) g_bnweapon[0][0] = g_priweapon;
+				else if (g_priweaponID[g_priweapon] == CSW_M4A1) g_bnweapon[0][1] = g_priweapon;
+				else if (g_priweaponID[g_priweapon] == CSW_AWP) g_bnweapon[0][2] = g_priweapon;
+				
 				g_priweapon += 1;
 			}
 			case 3:
@@ -274,9 +274,9 @@ LoadDMSettingFile()
 				g_secweaponID[g_secweapon] = get_user_weapon_id(weaponid);
 				g_secweaponN[g_secweapon] = weaponname;
 
-				if (equal(g_secweaponID[g_secweapon], "weapon_glock18")) g_bnweapon[1][0] = g_priweapon;
-				else if (equal(g_secweaponID[g_secweapon], "weapon_usp")) g_bnweapon[1][1] = g_priweapon;
-				else if (equal(g_secweaponID[g_secweapon], "weapon_deagle")) g_bnweapon[1][2] = g_priweapon;
+				if (g_secweaponID[g_secweapon] == CSW_DEAGLE) g_bnweapon[1][0] = g_secweapon;
+				else if (g_secweaponID[g_secweapon] == CSW_USP) g_bnweapon[1][1] = g_secweapon;
+				else if (g_secweaponID[g_secweapon] == CSW_GLOCK18) g_bnweapon[1][2] = g_secweapon;
 
 				g_secweapon += 1;
 			}
@@ -461,30 +461,25 @@ public dm_showHudMsg(id)
 		{
 			if (g_winIndex == 1)
 			{
-				set_hudmessage(255,0,0, -1.0, 0.21, 0, 6.0, 999.0, 0.1, 0.2, -1);
+				set_hudmessage(255,0,0, -1.0, 0.24, 0, 6.0, 999.0, 0.1, 0.2, -1);
 				msgPart += formatex(hudMsg[msgPart], sizeof hudMsg -1 - msgPart, "^n^n%L", LANG_PLAYER, "TR_WIN_MSG", g_Nmap_name[g_nextRoundMap]);
 			}
 			else
 			{
-				set_hudmessage(0,0,255, -1.0, 0.21, 0, 6.0, 999.0, 0.1, 0.2, -1);
+				set_hudmessage(0,0,255, -1.0, 0.24, 0, 6.0, 999.0, 0.1, 0.2, -1);
 				msgPart += formatex(hudMsg[msgPart], sizeof hudMsg -1 - msgPart, "^n^n%L", LANG_PLAYER, "CT_WIN_MSG", g_Nmap_name[g_nextRoundMap]);
 			}
 		}
 		else
 		{
-			set_hudmessage(174,120,121, -1.0, 0.21, 0, 6.0, 999.0, 0.1, 0.2, -1);
+			set_hudmessage(174,120,121, -1.0, 0.24, 0, 6.0, 999.0, 0.1, 0.2, -1);
 			new win_player[32];
 			get_user_name(g_winIndex, win_player, 31);
 			msgPart += formatex(hudMsg[msgPart], sizeof hudMsg -1 - msgPart, "^n^n%L", LANG_PLAYER, "PL_WIN_MSG", win_player, g_Nmap_name[g_nextRoundMap]);
 		}
 	}
 	else
-	{
-		if (is_user_alive(id))
-			set_hudmessage(100, 100, 100, -1.0, 0.21, 0, 6.0, 999.0, 0.1, 0.2, -1);
-		else
-			set_hudmessage(100, 100, 100, 0.12, 0.21, 0, 6.0, 999.0, 0.1, 0.2, -1);
-	}
+		set_hudmessage(0, 255, 0, -1.0, 0.24, 0, 6.0, 999.0, 0.1, 0.2, -1);
 	
 	ShowSyncHudMsg(id, g_msgSync, hudMsg);
 
@@ -809,13 +804,27 @@ public logevent_round_start()
 	if (g_dmMode == MODE_TDM)
 	{
 		if (g_MaxKill <= 0)
-			g_MaxKill = random_num(10, 15) * (iNum-1);
+		{
+			new maxKill = random_num(5, 7) * iNum;
+			maxKill /= 10;
+			maxKill *= 10;
+		
+			g_MaxKill = maxKill;
+		}
 
 		client_print(0, print_center, "%L", LANG_PLAYER, "TDM_GS_MSG", g_MaxKill);
 	}
 	else
 	{
-		if (g_MaxKill <= 0) g_MaxKill = random_num(4, 6) * (iNum-1);
+		if (g_MaxKill <= 0)
+		{
+			new maxKill = random_num(2, 3) * (iNum-1);
+			maxKill /= 10;
+			maxKill *= 10;
+		
+			g_MaxKill = maxKill;
+		}
+			
 		client_print(0, print_center, "%L", LANG_PLAYER, "PDM_GS_MSG", g_MaxKill);
 	}
 	g_dm_roundStart = true
@@ -835,7 +844,6 @@ public dm_menu_weap(id)
 	
 	if (m_pri_weaponid[id] == 0 && m_sec_weaponid[id] == 0)
 	{
-		client_print(id, print_chat, "*****************");
 		dm_menu_pri_weap (id);
 		return;
 	}
@@ -880,8 +888,11 @@ public dm_menu_pri_weap(id)
 	if (dm_user_tbot(id))
 	{
 		new random, weaponid;
-		random = random_num(0, g_priweapon-1);
-		weaponid = g_priweaponID[random];
+		random = random_num(0, 5);
+		if (random < 3 && g_bnweapon[0][random] != -1)
+			weaponid = g_priweaponID[g_bnweapon[0][random]];
+		else
+			weaponid = g_priweaponID[random_num(0, g_priweapon-1)];
 		
 		if (weaponid && ((1<<weaponid) & PRIMARY_WEAPONS_BIT_SUM))
 		{
@@ -894,19 +905,8 @@ public dm_menu_pri_weap(id)
 			m_chosen_pri_weap[id] = false;
 		}
 
-		if (g_bnweapon[0][0] != -1 || g_bnweapon[0][1] != -1 || g_bnweapon[0][2] != -1)
-		{
-			random = random_num(0, 3);
-			if (random != 3 && g_bnweapon[0][random] != -1)
-			{
-				m_pri_weaponid[id] = random;
-				m_chosen_pri_weap[id] = true;
-			}
-		}
-		
 		dm_menu_sec_weap(id);
-		
-		return;
+		return; 
 	}
 
 	static weap_menu_name[100];
@@ -980,8 +980,11 @@ public dm_menu_sec_weap(id)
 	if (dm_user_tbot(id))
 	{
 		new random, weaponid;
-		random = random_num(0, g_secweapon-1);
-		weaponid = g_secweaponID[random];
+		random = random_num(0, 5);
+		if (random < 3 && g_bnweapon[1][random] != -1)
+			weaponid = g_secweaponID[g_bnweapon[1][random]];
+		else
+			weaponid = g_secweaponID[random_num(0, g_secweapon-1)];
 		
 		if (weaponid && ((1<<weaponid) & SECONDARY_WEAPONS_BIT_SUM))
 		{
@@ -994,16 +997,6 @@ public dm_menu_sec_weap(id)
 			m_chosen_sec_weap[id] = false;
 		}
 
-		if (g_bnweapon[1][0] != -1 || g_bnweapon[1][1] != -1 || g_bnweapon[1][2] != -1)
-		{
-			random = random_num(0, 3);
-			if (random != 3 && g_bnweapon[1][random] != -1)
-			{
-				m_sec_weaponid[id] = random;
-				m_chosen_sec_weap[id] = true;
-			}
-		}
-		
 		set_task (0.1, "dm_user_spawn", id);
 		return;
 	}
