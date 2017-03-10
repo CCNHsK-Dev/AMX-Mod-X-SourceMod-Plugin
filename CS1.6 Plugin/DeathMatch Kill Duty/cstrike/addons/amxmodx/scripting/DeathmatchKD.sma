@@ -14,7 +14,7 @@
 #include <hamsandwich>
 
 #define PLUGIN	"Deathmatch: Kill Duty"
-#define VERSION	"3.0.9.8"
+#define VERSION	"3.0.9.10"
 #define AUTHOR	"HsK-Dev Blog By CCN"
 
 new const MAX_BPAMMO[] = { -1, 52, -1, 90, 1, 32, 1, 100, 90, 1, 120, 100, 100, 90, 90, 90, 100, 120,
@@ -79,9 +79,12 @@ new g_CT_kill, g_TR_kill; // CT and TR Kill [tdm]
 new g_winIndex; // Win Team / Player Id
 
 new g_Nmap_NU, g_Nmap_name[256][32], g_nextRoundMap; // Next Map
-new Float:g_nextRoundTime;
+new Float:g_nextRoundTime; // Change Next Map Time
 
-new Float:g_spawnPoint[128][3], g_spawnCount; // Ran Spawn set
+new g_spawnCount; // Spawan Point Num
+new Float:g_spawnPoint[128][3]; // Spawn Point Origin
+new Float:g_spawnAngles[128][3]; // Spawn Point Angles
+
 new Float:g_spawnTime; // Player Respawn Time
 new Float:g_spawnGodTime; // Player Protect Time
 new Float:g_spawnMaxTime; // Player Enforcement Respawn Time
@@ -103,6 +106,7 @@ new g_bnweapon[2][3];  // Bot Nice Weapon (AK/M4...)
 // Player vars
 new m_in_buyzone[33]; // Is Buy Zone
 new m_player_kill[33]; // Player Kill [pdm]
+new m_killMSGIndex[33][2]; // For kill MSG
 
 new bool:m_chosen_pri_weap[33]; // Is Pri Weap set
 new bool:m_chosen_sec_weap[33]; // Is Sec Weap set
@@ -113,12 +117,13 @@ new bool:m_weaponSilen[33][2]; // Save M4A1 / USP Silen
 new bool:m_dead_fl[33]; // Player Dead Perspective
 new bool:m_dmdamage[33] = false;  // DM Damage
 
-new Float:m_showHudMsgTime[33];
-new Float:m_setDeadFlagTime[33];
-new Float:m_spawnTime[33];
-new Float:m_spawnMaxTime[33];
-new Float:m_spawnGodTime[33];
-new Float:m_buyzoneTime[33];
+new Float:m_showHudMsgTime[33]; // Updata Hud Msg Time
+new Float:m_showKillMSGTime[33]; // Show Kill Hud Msg Time
+new Float:m_setDeadFlagTime[33]; // Set Dead Flag Time
+new Float:m_spawnTime[33]; // Spawn Time
+new Float:m_spawnMaxTime[33]; // Max Spawn Time
+new Float:m_spawnGodTime[33]; // Spawn God Time
+new Float:m_buyzoneTime[33]; // Get Player in Buyzone Time
 
 // Message IDs vars
 new g_msgHideWeapon, g_msgCrosshair, g_msgSync, g_msgStatusText, g_magStatusValue;
@@ -294,17 +299,20 @@ LoadDMSettingFile()
 }
 
 // Random Spawns ============================
-public SetSpawnPoint(id)
+public SaveSpawnPoint(id)
 {
-	new cfgdir[32], mapname[32], filepath[100], Float:origin[3], buffer[512], file;
+	new cfgdir[32], mapname[32], filepath[100], buffer[512], file;
 	get_configsdir(cfgdir, charsmax(cfgdir));
 	get_mapname(mapname, charsmax(mapname));
 	formatex(filepath, charsmax(filepath), "%s/Dm_KD/spawn/%s.cfg", cfgdir, mapname);
-	pev(id, pev_origin, origin);
-
 	file = fopen(filepath,"at");
+	
+	new Float:origin[3], Float:angles[3];
+	pev(id, pev_origin, origin);
+	pev(id, pev_angles, angles);
 
-	format(buffer, charsmax(buffer), "%f %f %f ^n", origin[0], origin[1], origin[2]);
+	format(buffer, charsmax(buffer), "%f %f %f %f %f %f ^n", 
+	origin[0], origin[1], origin[2], angles[0], angles[1], angles[2]);
 	fputs(file, buffer);
 
 	fclose(file);
@@ -330,6 +338,7 @@ stock LoadSpawnPoint()
 	if (file_exists(filepath))
 	{
 		new data[10][6], file = fopen(filepath,"rt");
+		new haveAnglesPoint = 0;
 		
 		while (file && !feof(file))
 		{
@@ -337,12 +346,19 @@ stock LoadSpawnPoint()
 
 			if(!linedata[0] || str_count(linedata,' ') < 2) continue;
 
-			parse(linedata,data[0],5,data[1],5,data[2],5);
+			parse(linedata,data[0],5,data[1],5,data[2],5,data[3],5,data[4],5,data[5],5);
 
 			g_spawnPoint[g_spawnCount][0] = str_to_float(data[0]);
 			g_spawnPoint[g_spawnCount][1] = str_to_float(data[1]);
 			g_spawnPoint[g_spawnCount][2] = str_to_float(data[2]);  //floatstr
-
+			
+			g_spawnAngles[g_spawnCount][0] = str_to_float(data[3]);
+			g_spawnAngles[g_spawnCount][1] = str_to_float(data[4]);
+			g_spawnAngles[g_spawnCount][2] = str_to_float(data[5]);
+			
+			if (g_spawnAngles[g_spawnCount][0] != 0.0 && g_spawnAngles[g_spawnCount][1] != 0.0)
+				haveAnglesPoint++;
+			
 			g_spawnCount++;
 			if (g_spawnCount >= sizeof g_spawnPoint)
 				break;
@@ -354,6 +370,7 @@ stock LoadSpawnPoint()
 		server_print("= MAP : %s", mapname);
 		server_print("= Load Spawns.....");
 		server_print("= Spawn Count Is %d", g_spawnCount);
+		server_print("= Has Angles Point %d", haveAnglesPoint);
 		server_print("==========================");
 	}
 	
@@ -397,7 +414,9 @@ public GetGameMap()
 // Admin meun ==========
 public dm_adminSettingMenu(id)
 {
-	if ((get_user_flags(id) & ACCESS_FLAG))
+	if (!(get_user_flags(id) & ACCESS_FLAG))
+		client_print(id, print_chat, "You Have not Admin Flags");
+	else
 	{
 		static menu[250], len;
 		len = 0;
@@ -416,7 +435,7 @@ public dm_admin_meun_set(id, key)
 {
 	switch (key)
 	{
-		case 0: SetSpawnPoint(id);
+		case 0: SaveSpawnPoint(id);
 	}
 }
 //=====================
@@ -447,14 +466,35 @@ public dm_showHudMsg(id)
 {
 	if (!g_dm_roundStart)
 		return;
+		
+	if (dm_user_tbot (id))
+		return;
 
 	new hudMsg[256], msgPart;
 	msgPart = 0;
 		
 	if (g_dmMode == MODE_TDM)
-		msgPart += formatex(hudMsg[msgPart], sizeof hudMsg -1 - msgPart, "%L", LANG_PLAYER, "TEAM_KILL_MSG", g_CT_kill, g_TR_kill, g_MaxKill);
+		msgPart += formatex(hudMsg[msgPart], sizeof hudMsg -1 - msgPart, "%L^n^n", id, "TEAM_KILL_MSG", g_CT_kill, g_TR_kill, g_MaxKill);
 	else
-		msgPart += formatex(hudMsg[msgPart], sizeof hudMsg -1 - msgPart, " %L", id, "P_KILL_MSG", m_player_kill[id], g_MaxKill);
+		msgPart += formatex(hudMsg[msgPart], sizeof hudMsg -1 - msgPart, " %L^n^n", id, "P_KILL_MSG", m_player_kill[id], g_MaxKill);
+		
+	if (m_killMSGIndex[id][0] != -1 && m_showKillMSGTime[id] != -1.0 && m_showKillMSGTime[id] >= get_gametime ())
+	{
+		new playerName[32];
+		get_user_name(m_killMSGIndex[id][0], playerName, 31);
+		if (m_killMSGIndex[id][1] == 0)
+			msgPart += formatex(hudMsg[msgPart], sizeof hudMsg -1 - msgPart, "%L", id, "DM_DEAD_MSG", playerName);
+		else if (g_dmMode == MODE_TDM)
+			msgPart += formatex(hudMsg[msgPart], sizeof hudMsg -1 - msgPart, "%L", id, "TDM_KILLER_MSG", playerName, m_player_kill[id]);
+		else
+			msgPart += formatex(hudMsg[msgPart], sizeof hudMsg -1 - msgPart, "%L", id, "DM_KILLER_MSG", playerName, m_player_kill[id], g_MaxKill);
+	}
+	else
+	{
+		m_killMSGIndex[id][0] = -1;
+		m_killMSGIndex[id][1] = -1;
+		m_showKillMSGTime[id] = -1.0;
+	}
 		
 	if (g_dm_roundEnd)
 	{
@@ -462,21 +502,21 @@ public dm_showHudMsg(id)
 		{
 			if (g_winIndex == 1)
 			{
-				set_hudmessage(255,0,0, -1.0, 0.24, 0, 6.0, 999.0, 0.1, 0.2, -1);
-				msgPart += formatex(hudMsg[msgPart], sizeof hudMsg -1 - msgPart, "^n^n%L", LANG_PLAYER, "TR_WIN_MSG", g_Nmap_name[g_nextRoundMap]);
+				set_hudmessage(150,100,0, -1.0, 0.24, 0, 6.0, 999.0, 0.1, 0.2, -1);
+				msgPart += formatex(hudMsg[msgPart], sizeof hudMsg -1 - msgPart, "^n^n%L", id, "TR_WIN_MSG", g_Nmap_name[g_nextRoundMap]);
 			}
 			else
 			{
-				set_hudmessage(0,0,255, -1.0, 0.24, 0, 6.0, 999.0, 0.1, 0.2, -1);
-				msgPart += formatex(hudMsg[msgPart], sizeof hudMsg -1 - msgPart, "^n^n%L", LANG_PLAYER, "CT_WIN_MSG", g_Nmap_name[g_nextRoundMap]);
+				set_hudmessage(0,100,150, -1.0, 0.24, 0, 6.0, 999.0, 0.1, 0.2, -1);
+				msgPart += formatex(hudMsg[msgPart], sizeof hudMsg -1 - msgPart, "^n^n%L", id, "CT_WIN_MSG", g_Nmap_name[g_nextRoundMap]);
 			}
 		}
 		else
 		{
-			set_hudmessage(174,120,121, -1.0, 0.24, 0, 6.0, 999.0, 0.1, 0.2, -1);
+			set_hudmessage(50,150,50, -1.0, 0.24, 0, 6.0, 999.0, 0.1, 0.2, -1);
 			new win_player[32];
 			get_user_name(g_winIndex, win_player, 31);
-			msgPart += formatex(hudMsg[msgPart], sizeof hudMsg -1 - msgPart, "^n^n%L", LANG_PLAYER, "PL_WIN_MSG", win_player, g_Nmap_name[g_nextRoundMap]);
+			msgPart += formatex(hudMsg[msgPart], sizeof hudMsg -1 - msgPart, "^n^n%L", id, "PL_WIN_MSG", win_player, g_Nmap_name[g_nextRoundMap]);
 		}
 	}
 	else
@@ -515,13 +555,15 @@ public fw_Spawn(entity)
 
 public fw_PlayerKilled(victim, attacker, shouldgib)
 {
+	new Float:gameTime = get_gametime ();
+
 	new die_sounD[32];
 	format(die_sounD, 31, "player/die%d.wav", random_num(1, 3));
 	emit_sound(victim, CHAN_BODY, die_sounD, 1.0, ATTN_NORM, 0, PITCH_NORM);
 
 	GetWeaponSilen (victim);
-	m_spawnTime[victim] = get_gametime () + g_spawnTime;	
-	m_setDeadFlagTime[victim] = get_gametime () + 0.1;
+	m_spawnTime[victim] = gameTime + g_spawnTime;	
+	m_setDeadFlagTime[victim] = gameTime + 0.1;
 
 	set_msg_block(get_user_msgid("HideWeapon"), BLOCK_SET);
 
@@ -534,7 +576,7 @@ public fw_PlayerKilled(victim, attacker, shouldgib)
 	set_pev(victim, pev_solid, SOLID_NOT);
 	set_pdata_int(victim, 444, get_user_deaths(victim) + 1, 5);
 	set_pev(victim, pev_sequence, random_num(106, 109));
-	set_pev(victim, pev_animtime, get_gametime()+0.07);
+	set_pev(victim, pev_animtime, gameTime+0.07);
 	set_pev(victim, pev_frame, 1.0);
 	set_pev(victim, pev_framerate, 1.0);
 
@@ -551,13 +593,17 @@ public fw_PlayerKilled(victim, attacker, shouldgib)
 	set_pev(attacker, pev_frags, float(pev(attacker, pev_frags)+1));
 	SendDeathMsg(attacker, victim, weapon_msgname[weapon], hitzone);
 
-	// 3.0.1 - Add Msg
-	new killer_name[32], victim_name[32];
-	get_user_name(attacker, killer_name, 31);
-	get_user_name(victim, victim_name, 31);
-	
 	m_player_kill[attacker] += 1;
-	client_print(victim, print_center,"%L", victim, "DM_DEAD_MSG", killer_name);
+	
+	m_killMSGIndex[victim][0] = attacker;
+	m_killMSGIndex[victim][1] = 0;
+	m_showKillMSGTime[victim] = gameTime + g_spawnTime;
+	m_showHudMsgTime[victim] = gameTime;
+	
+	m_killMSGIndex[attacker][0] = victim;
+	m_killMSGIndex[attacker][1] = 1;
+	m_showKillMSGTime[attacker] = gameTime + 4.0;
+	m_showHudMsgTime[attacker] = gameTime;
 	
 	if (g_dmMode == MODE_TDM)
 	{
@@ -565,8 +611,6 @@ public fw_PlayerKilled(victim, attacker, shouldgib)
 		{
 			if (fm_get_user_team(victim) == 1) g_CT_kill += 1;
 			else if (fm_get_user_team(victim) == 2) g_TR_kill += 1;
-			
-			client_print(attacker, print_center,"%L", attacker, "TDM_KILLER_MSG", victim_name, m_player_kill[attacker]);
 
 			if (g_CT_kill >= g_MaxKill || g_TR_kill >= g_MaxKill)
 			{
@@ -580,8 +624,6 @@ public fw_PlayerKilled(victim, attacker, shouldgib)
 	{
 		if (g_KEAddHp > 0)
 			fm_set_user_health(attacker, min(fm_get_user_health(attacker) + g_KEAddHp, 100));
-			
-		client_print(attacker, print_center,"%L", attacker, "DM_KILLER_MSG", victim_name, m_player_kill[attacker], g_MaxKill);
 
 		if (m_player_kill[attacker] >= g_MaxKill)
 		{
@@ -733,7 +775,7 @@ public fw_PlayerPreThink (id)
 	{
 		if (m_spawnMaxTime[id] != -1.0 && m_spawnMaxTime[id] <= gameTime)
 		{
-			dm_inev_res (id);
+			dm_enforcementSpawn (id);
 			m_spawnMaxTime[id] = -1.0;
 		}
 		
@@ -840,6 +882,12 @@ public dm_menu_weap(id)
 	if (fm_get_user_team(id) != 1 && fm_get_user_team(id) != 2)
 		return;
 
+	if (dm_user_tbot(id))
+	{
+		dm_menu_pri_weap(id);
+		return;
+	}
+		
 	m_spawnMaxTime[id] = get_gametime () + g_spawnMaxTime;
 	client_print(id, print_center, "%L", id, "INEV_RES_MSG", g_spawnMaxTime);
 	
@@ -849,19 +897,14 @@ public dm_menu_weap(id)
 		return;
 	}
 
-	if (dm_user_tbot(id))
-		dm_menu_pri_weap(id);
-	else
-	{
-		static menu[250], len;
-		len = 0;
+	static menu[250], len;
+	len = 0;
 
-		len += formatex(menu[len], sizeof menu - 1 - len, "\y %L^n^n", id, "AGET_WEAP_MEUN1");
-		len += formatex(menu[len], sizeof menu - 1 - len, "\r1.\w %L ^n", id, "AGET_WEAP_MEUN2");
-		len += formatex(menu[len], sizeof menu - 1 - len, "\r2.\w %L^n", id, "AGET_WEAP_MEUN3");
+	len += formatex(menu[len], sizeof menu - 1 - len, "\y %L^n^n", id, "AGET_WEAP_MEUN1");
+	len += formatex(menu[len], sizeof menu - 1 - len, "\r1.\w %L ^n", id, "AGET_WEAP_MEUN2");
+	len += formatex(menu[len], sizeof menu - 1 - len, "\r2.\w %L^n", id, "AGET_WEAP_MEUN3");
 
-		show_menu(id, KEYSMENU, menu, -1, "UsE WeapoN MeuN");
-	}
+	show_menu(id, KEYSMENU, menu, -1, "UsE WeapoN MeuN");
 }
 
 public dm_weapon_meun_set(id, key)
@@ -1094,10 +1137,7 @@ public dm_user_spawn(id)
 		
 		new weaponid = m_pri_weaponid[id];
 		fm_give_item(id, WEAPON_CLASSNAME[weaponid]);
-		
-		while (fm_get_user_bpammo(id, weaponid) != MAX_BPAMMO[weaponid])
-			ExecuteHamB(Ham_GiveAmmo, id, BUY_AMMO[weaponid], AMMO_TYPE[weaponid], MAX_BPAMMO[weaponid]);
-			
+
 		if (m_weaponSilen[id][0] && (1<<weaponid) & (1<<CSW_M4A1))
 		{
 			new class[32];
@@ -1116,9 +1156,6 @@ public dm_user_spawn(id)
 		new weaponid = m_sec_weaponid[id];
 		fm_give_item(id, WEAPON_CLASSNAME[weaponid]);
 
-		while (fm_get_user_bpammo(id, weaponid) != MAX_BPAMMO[weaponid])
-			ExecuteHamB(Ham_GiveAmmo, id, BUY_AMMO[weaponid], AMMO_TYPE[weaponid], MAX_BPAMMO[weaponid]);
-		
 		if (m_weaponSilen[id][1] && (1<<weaponid) & (1<<CSW_USP))
 		{
 			new class[32];
@@ -1129,6 +1166,9 @@ public dm_user_spawn(id)
 		
 		m_chosen_sec_weap[id] = false;
 	}
+	
+	for (new i = 0; i < sizeof WEAPON_CLASSNAME; i++)
+		ExecuteHamB(Ham_GiveAmmo, id, BUY_AMMO[i], AMMO_TYPE[i], MAX_BPAMMO[i]);
 
 	if (g_giveGrenade[0]) fm_give_item(id, "weapon_hegrenade");
 	if (g_giveGrenade[1]) fm_give_item(id, "weapon_flashbang");
@@ -1139,7 +1179,7 @@ public dm_user_spawn(id)
 // ==================
 
 // Plug-in Function =======
-public dm_inev_res(id)
+public dm_enforcementSpawn(id)
 {
 	if (is_user_alive(id))
 		return;
@@ -1180,6 +1220,9 @@ public dm_setSpawnPoint (id)
 	}
 
 	fm_set_user_origin (id, g_spawnPoint[spawnPoint]);
+	
+	if (g_spawnAngles[spawnPoint][0] != 0.0 && g_spawnAngles[spawnPoint][1] != 0.0)
+		set_pev(id,pev_angles,g_spawnAngles[spawnPoint]);
 }
 
 public GetWeaponSilen (id)
@@ -1273,7 +1316,7 @@ public event_ShowStatus(id)
 		return;
 		
 	new i = read_data(2);
-	if (!is_user_alive(i) || !is_user_alive(id))
+	if (!is_user_alive(i) || !is_user_alive(id) || dm_user_tbot (id))
 		return;
 	
 	static text[100], magtext[100];
