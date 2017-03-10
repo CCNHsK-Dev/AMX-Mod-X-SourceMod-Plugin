@@ -14,7 +14,7 @@
 #include <hamsandwich>
 
 #define PLUGIN	"Deathmatch: Kill Duty"
-#define VERSION	"3.0.9.5"
+#define VERSION	"3.0.9.6"
 #define AUTHOR	"HsK-Dev Blog By CCN"
 
 new const MAX_BPAMMO[] = { -1, 52, -1, 90, 1, 32, 1, 100, 90, 1, 120, 100, 100, 90, 90, 90, 100, 120,
@@ -53,10 +53,6 @@ new const OBJECTIVE_ENTITYS[][] = {  "func_bomb_target", "info_bomb_target", "in
 	"func_escapezone", "hostage_entity", "monster_scientist", "func_hostage_rescue", "info_hostage_rescue", "env_fog", 
 	"env_rain", "env_snow", "item_longjump", "func_vehicle" }
 
-
-#define TASK_ORIGIN_SET 1805
-
-
 const OFFSET_CSTEAMS = 114
 const OFFSET_CSMONEY = 115
 const OFFSET_DEFUSE_PLANT = 193
@@ -85,7 +81,6 @@ new g_winIndex; // Win Team / Player Id
 new g_Nmap_NU, g_Nmap_name[256][32], g_nextRoundMap; // Next Map
 new Float:g_nextRoundTime;
 
-new bool:g_ranspawn = false; // Ran Spawn mod
 new Float:g_spawnPoint[128][3], g_spawnCount; // Ran Spawn set
 new Float:g_spawnTime; // Player Respawn Time
 new Float:g_spawnGodTime; // Player Protect Time
@@ -290,7 +285,10 @@ LoadDMSettingFile()
 	if (file) fclose(file)
 		
 	GetGameMap();
-	LoadSpawnPoint();
+	
+	if (g_dmMode == MODE_DM)
+		LoadSpawnPoint();
+	
 	DM_BaseGameSetting();
 }
 
@@ -321,6 +319,8 @@ public SetSpawnPoint(id)
 
 stock LoadSpawnPoint()
 {
+	g_spawnCount = 0;
+
 	new cfgdir[32], mapname[32], filepath[100], linedata[64];
 	get_configsdir(cfgdir, charsmax(cfgdir));
 	get_mapname(mapname, charsmax(mapname));
@@ -347,7 +347,6 @@ stock LoadSpawnPoint()
 				break;
 		}
 		if (file) fclose(file);
-		g_ranspawn = true;
 
 		server_print("==========================");
 		server_print("= [Deathmatch: Kill Duty]     ");
@@ -356,8 +355,12 @@ stock LoadSpawnPoint()
 		server_print("= Spawn Count Is %d", g_spawnCount);
 		server_print("==========================");
 	}
-	else
-		g_ranspawn = false;
+	
+	if (g_spawnCount == 0)
+	{
+		server_print("%L", LANG_PLAYER, "ERROR_PDM", mapname);
+		g_dmMode = MODE_TDM;
+	}
 }
 //==============
 
@@ -422,14 +425,6 @@ public DM_BaseGameSetting()
 {
 	if (g_dmMode != MODE_DM)
 		g_dmMode = MODE_TDM;
-
-	if (g_dmMode == MODE_DM && !g_ranspawn)
-	{
-		g_dmMode = MODE_TDM;
-
-		new mapname[32]; get_mapname(mapname, charsmax(mapname));
-		server_print("%L", LANG_PLAYER, "ERROR_PDM", mapname);
-	}
 
 	if (g_startTimeData < 5)
 		g_startTimeData = 5;
@@ -672,11 +667,7 @@ public fw_startFrame ()
 				set_task(0.1, "event_hud_reset", id);
 				m_dead_fl[id] = false;
 					
-				if (g_dmMode == MODE_DM && g_ranspawn)
-				{
-					remove_task(id+TASK_ORIGIN_SET);
-					fm_set_user_origin(id+TASK_ORIGIN_SET, g_spawnPoint[random_num(0, g_spawnCount - 1)]);
-				}
+				dm_setSpawnPoint (id);
 			}
 		}
 	}
@@ -1092,11 +1083,7 @@ public dm_user_spawn(id)
 		if (g_spawnGodTime > 0.0)
 			m_spawnGodTime[id] = get_gametime () + g_spawnGodTime;
 		
-		if (g_dmMode == MODE_DM && g_ranspawn)
-		{
-			remove_task(id+TASK_ORIGIN_SET);
-			fm_set_user_origin(id+TASK_ORIGIN_SET, g_spawnPoint[random_num(0, g_spawnCount - 1)]);
-		}
+		dm_setSpawnPoint (id);
 	}
 
 	fm_strip_user_weapons(id);
@@ -1141,7 +1128,7 @@ public dm_user_spawn(id)
 }
 // ==================
 
-// Will Spawn... =======
+// Plug-in Function =======
 public dm_inev_res(id)
 {
 	if (is_user_alive(id))
@@ -1149,6 +1136,40 @@ public dm_inev_res(id)
 
 	dm_user_spawn(id);
 	dm_menu_weap(id);
+}
+
+public dm_setSpawnPoint (id)
+{
+	if (g_dmMode != MODE_DM || !is_user_alive(id))
+		return;
+	
+	new spawnPoint = -1;
+	static hull;
+	hull = (pev(id, pev_flags) & FL_DUCKING) ? HULL_HEAD : HULL_HUMAN
+	while (spawnPoint == -1)
+	{
+		spawnPoint = random_num(0, g_spawnCount - 1);
+		
+		if (!is_hull_vacant(g_spawnPoint[spawnPoint], hull))
+			spawnPoint = -1;
+		else
+		{
+			new otherEntity = -1;
+			while((otherEntity = engfunc(EngFunc_FindEntityInSphere,otherEntity,g_spawnPoint[spawnPoint],360.0))) 
+			{
+				if (!pev_valid(otherEntity) || otherEntity == id)
+					continue
+					
+				if (is_user_alive (otherEntity))
+				{
+					spawnPoint = -1;
+					break;
+				}
+			}
+		}
+	}
+
+	fm_set_user_origin (id, g_spawnPoint[spawnPoint]);
 }
 // ====================
 
@@ -1447,34 +1468,7 @@ stock dm_force_team_join(id, menu_msgid, team[] = "5", class[] = "5")
 	set_msg_block(menu_msgid, msg_block);
 	dm_menu_weap(id);
 
-	if (is_user_alive(id) && g_dmMode == MODE_DM && g_ranspawn)
-	{
-		remove_task(id+TASK_ORIGIN_SET);
-		fm_set_user_origin(id+TASK_ORIGIN_SET, g_spawnPoint[random_num(0, g_spawnCount - 1)]);
-	}
-}
-
-stock is_hull_vacant(Float:origin[3], hull)
-{
-	engfunc(EngFunc_TraceHull, origin, origin, 0, hull, 0, 0);
-	
-	if (!get_tr2(0, TR_StartSolid) && !get_tr2(0, TR_AllSolid) && get_tr2(0, TR_InOpen))
-		return true;
-	
-	return false;
-}
-
-stock is_player_stuck(id)
-{
-	static Float:originF[3];
-	pev(id, pev_origin, originF);
-	
-	engfunc(EngFunc_TraceHull, originF, originF, 0, (pev(id, pev_flags) & FL_DUCKING) ? HULL_HEAD : HULL_HUMAN, id, 0);
-	
-	if (get_tr2(0, TR_StartSolid) || get_tr2(0, TR_AllSolid) || !get_tr2(0, TR_InOpen))
-		return true;
-	
-	return false;
+	dm_setSpawnPoint (id);
 }
 
 SendDeathMsg(attacker, victim, const weapon[], hs)
@@ -1503,6 +1497,16 @@ SendDeathMsg(attacker, victim, const weapon[], hs)
 	message_end()  
 }
 
+stock is_hull_vacant(Float:origin[3], hull)
+{
+	engfunc(EngFunc_TraceHull, origin, origin, 0, hull, 0, 0)
+	
+	if (!get_tr2(0, TR_StartSolid) && !get_tr2(0, TR_AllSolid) && get_tr2(0, TR_InOpen))
+		return true;
+	
+	return false;
+}
+
 stock fm_strip_user_weapons(index)
 {
 	new ent = fm_create_entity("player_weaponstrip");
@@ -1520,9 +1524,7 @@ stock fm_get_user_team(id)
 	return get_pdata_int(id, OFFSET_CSTEAMS, OFFSET_LINUX);
 
 stock fm_set_user_team(id, team)
-{
 	set_pdata_int(id, OFFSET_CSTEAMS, team, OFFSET_LINUX)
-}
 
 stock fm_cs_set_user_money(id, value)
 	set_pdata_int(id, OFFSET_CSMONEY, value, OFFSET_LINUX)
@@ -1584,9 +1586,8 @@ stock fm_give_item(index, const item[])
 }
 
 stock fm_create_entity(const classname[])
-{
 	return engfunc(EngFunc_CreateNamedEntity, engfunc(EngFunc_AllocString, classname))
-}
+
 
 stock drop_weapons(id, dropwhat) // dropwhat: 1 = primary weapon , 2 = secondary weapon
 {
@@ -1690,25 +1691,8 @@ stock fm_get_user_bpammo(index, weapon)
 	return get_pdata_int(index,offset);
 }
 
-stock fm_set_user_origin(taskid, Float:origin[3])
-{
-	new id = taskid - TASK_ORIGIN_SET
-
-	if (!is_hull_vacant(origin, ((pev(id, pev_flags) & FL_DUCKING) ? HULL_HEAD : HULL_HUMAN)))
-	{
-		remove_task(id+TASK_ORIGIN_SET)
-		fm_set_user_origin(id+TASK_ORIGIN_SET, g_spawnPoint[random_num(0, g_spawnCount - 1)])
-		return;
-	}
-
-	engfunc(EngFunc_SetOrigin, id, origin)
-
-	if (is_player_stuck(id))
-	{
-		remove_task(id+TASK_ORIGIN_SET)
-		fm_set_user_origin(id+TASK_ORIGIN_SET, g_spawnPoint[random_num(0, g_spawnCount - 1)])
-	}
-}
+stock fm_set_user_origin(id, Float:origin[3])
+	engfunc(EngFunc_SetOrigin, id, origin);
 
 stock fm_get_user_defuse(id)
 {
@@ -1786,9 +1770,8 @@ stock fm_set_user_velocity(entity, const Float:vector[3])
 }
 
 stock fm_get_user_velocity(entity, Float:vector[3])
-{
 	return pev(entity, pev_velocity, vector)
-}
+
 
 stock get_user_weapon_id(const weapon[])
 {
