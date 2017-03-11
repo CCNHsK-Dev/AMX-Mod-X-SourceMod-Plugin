@@ -15,7 +15,7 @@
 #include <hamsandwich>
 
 #define PLUGIN	"Deathmatch: Kill Duty"
-#define VERSION	"3.0.9.13"
+#define VERSION	"3.0.9.15"
 #define AUTHOR	"HsK-Dev Blog By CCN"
 
 new const MAX_BPAMMO[] = { -1, 52, -1, 90, 1, 32, 1, 100, 90, 1, 120, 100, 100, 90, 90, 90, 100, 120,
@@ -86,6 +86,7 @@ new g_spawnCount; // Spawan Point Num
 new Float:g_spawnPoint[128][3]; // Spawn Point Origin
 new Float:g_spawnAngles[128][3]; // Spawn Point Angles
 
+new Float:g_countDownTime; // Count Down Time
 new Float:g_spawnTime; // Player Respawn Time
 new Float:g_spawnGodTime; // Player Protect Time
 new Float:g_spawnMaxTime; // Player Enforcement Respawn Time
@@ -102,7 +103,7 @@ new g_dmModeKillerAddHP; // Kill Enemy Add HP (DM Mode)
 
 // Weapons Menu
 new g_priweapon, g_secweapon, g_priweaponID[30], g_secweaponID[30], 
-g_priweaponN[30][512], g_secweaponN[30][512];
+g_priweaponN[30][64], g_secweaponN[30][64];
 new g_bnweapon[2][3];  // Bot Nice Weapon (AK/M4...)
 
 // Player vars
@@ -191,19 +192,68 @@ public plugin_init()
 	register_menu("UsE WeapoN MeuN", KEYSMENU, "dm_weapon_meun_set");
 	register_menu("Admin Menu 1", KEYSMENU, "dm_admin_meun_set");
 
-	LoadDMSettingFile();
-
+	LoadDMKDSetting ();
+	
 	register_dictionary("DeathmatchKD.txt");
 
 	cvar_botquota = get_cvar_pointer("bot_quota");
 }
 
 // DM:KD Setting Loading =========
-LoadDMSettingFile()
+LoadDMKDSetting ()
 {
 	g_bnweapon[0][0] = -1; g_bnweapon[0][1] = -1; g_bnweapon[0][2] = -1;
 	g_bnweapon[1][0] = -1; g_bnweapon[1][1] = -1; g_bnweapon[1][2] = -1;
+	
+	g_dmMode = random_num (0, 1);
+	g_spawnTime = 3.0;
+	g_spawnGodTime = 3.0;
+	g_spawnMaxTime = 8.0;
+	g_weaponRemoveTime = 8.0;
+	g_blockSuicide = true;
+	g_unlimitAmmo = true;
+	g_giveGrenade[0] = false;
+	g_giveGrenade[1] = false;
+	g_giveGrenade[2] = false;
+	g_startTimeData = 10;
+	g_MaxKill = 0;
+	g_BZAddHp = true;
+	g_BZAddHpTime = 5.0;
+	g_BZAddHpAmounT = 10;
+	g_dmModeKillerAddHP = 10;
+	g_deadSeePlayerTime = 4.0;
+	
+	LoadDMSettingFile();
 
+	if (g_priweapon == 0)
+	{
+		g_priweapon = 3;
+		g_priweaponID[0] = CSW_AK47;
+		format(g_priweaponN[0], 63, "AK47");
+		g_priweaponID[1] = CSW_M4A1;
+		format(g_priweaponN[1], 63, "M4A1");
+		g_priweaponID[2] = CSW_AWP;
+		format(g_priweaponN[2], 63, "AWP");
+	}
+	
+	if (g_secweapon == 0)
+	{
+		g_secweapon = 3;
+		g_secweaponID[0] = CSW_DEAGLE;
+		format(g_secweaponN[0], 63, "DEAGLE");
+		g_secweaponID[1] = CSW_USP;
+		format(g_secweaponN[1], 63, "USP");
+		g_secweaponID[2] = CSW_GLOCK18;
+		format(g_secweaponN[2], 63, "GLOCK18");
+	}
+	
+	GetGameMap();
+	LoadSpawnPoint();
+	DM_BaseGameSetting();
+}
+
+LoadDMSettingFile()
+{
 	new path[64];
 	get_configsdir(path, charsmax(path));
 	format(path, charsmax(path), "%s/Dm_KD/DeathmatchKD_Setting.ini", path);
@@ -264,7 +314,7 @@ LoadDMSettingFile()
 			}
 			case 2:
 			{
-				new weaponid[255], weaponname[512];
+				new weaponid[255], weaponname[64];
 				strtok(linedata, weaponid, charsmax(weaponid), weaponname, charsmax(weaponname), ',');
 
 				g_priweaponID[g_priweapon] = get_user_weapon_id(weaponid);
@@ -278,7 +328,7 @@ LoadDMSettingFile()
 			}
 			case 3:
 			{
-				new weaponid[255], weaponname[512];
+				new weaponid[255], weaponname[64];
 				strtok(linedata, weaponid, charsmax(weaponid), weaponname, charsmax(weaponname), ',');
 
 				g_secweaponID[g_secweapon] = get_user_weapon_id(weaponid);
@@ -293,15 +343,6 @@ LoadDMSettingFile()
 		}
 	}
 	if (file) fclose(file)
-	
-	g_deadSeePlayerTime = 4.0;
-	
-	GetGameMap();
-	
-	if (g_dmMode == MODE_DM)
-		LoadSpawnPoint();
-	
-	DM_BaseGameSetting();
 }
 
 // Random Spawns ============================
@@ -391,6 +432,8 @@ stock LoadSpawnPoint()
 // Random Map ============
 public GetGameMap()
 {
+	g_Nmap_NU = 0;
+
 	new path[64];
 	get_configsdir(path, charsmax(path));
 	format(path, charsmax(path), "%s/Dm_KD/maps.ini", path);
@@ -409,9 +452,8 @@ public GetGameMap()
 		
 		if(!linedata[0] || linedata[0] == ';' || (linedata[0] == '/' && linedata[1] == '/')) continue;
 		
-		g_Nmap_NU += 1;
-		
 		copy(g_Nmap_name[g_Nmap_NU] , charsmax(g_Nmap_name), linedata);
+		g_Nmap_NU++;
 	}
 	if (file) fclose(file);
 }
@@ -463,6 +505,8 @@ public DM_BaseGameSetting()
 	g_TR_kill = 0;
 	g_CT_kill = 0;
 	g_nextRoundMap = -1;
+	
+	CheckSyPBMode ();
 }
 
 //==========================
@@ -495,6 +539,7 @@ public event_round_start()
 	DM_BaseGameSetting ();
 	
 	g_startTime = g_startTimeData + floatround(get_gametime ());
+	g_countDownTime = get_gametime ();
 	
 	for (new id = 1; id <= get_maxplayers(); id++)
 	{
@@ -540,6 +585,8 @@ public logevent_round_start()
 	g_dm_roundStart = true
 	g_dm_roundEnd = false;
 	g_winIndex = -1;
+	
+	CheckSyPBMode ();
 }
 // =====================
 
@@ -626,7 +673,7 @@ public fw_PlayerKilled(victim, attacker, shouldgib)
 	weapon = get_user_weapon(attacker);
 
 	set_pev(attacker, pev_frags, float(pev(attacker, pev_frags)+1));
-	SendDeathMsg(attacker, victim, weapon_msgname[weapon], hitzone);
+	SendDeathMsg(attacker, victim, weapon_msgname[weapon], (hitzone == 1) ? 1 : 0);
 
 	m_player_kill[attacker] += 1;
 		
@@ -655,7 +702,6 @@ public fw_PlayerKilled(victim, attacker, shouldgib)
 
 			if (g_CT_kill >= g_MaxKill || g_TR_kill >= g_MaxKill)
 			{
-				g_dm_roundEnd = true;
 				g_winIndex = fm_get_user_team (attacker);
 				dm_game_end();
 			}
@@ -668,7 +714,6 @@ public fw_PlayerKilled(victim, attacker, shouldgib)
 
 		if (m_player_kill[attacker] >= g_MaxKill)
 		{
-			g_dm_roundEnd = true;
 			g_winIndex = attacker;
 			dm_game_end();
 		}
@@ -719,45 +764,17 @@ public fw_TakeDamage_Post(victim)
 // Forard Hook ==================
 public fw_startFrame ()
 {
-	static firstSetting = false;
 	if (!g_dm_roundStart)
 	{
-		new countDownTime = g_startTime - floatround(get_gametime ());
-
-		client_print(0, print_center,"%L", LANG_PLAYER, "FREEZE_MSG", countDownTime);
-
-		if (countDownTime == 1 && !firstSetting)
+		if (g_countDownTime <= get_gametime ())
 		{
-			firstSetting = true;
-			for (new id = 1; id <= get_maxplayers(); id++)
-			{
-				if (!is_user_connected(id))
-					continue;
-
-				if (!is_user_alive(id))
-					continue;
-
-				set_msg_block(get_user_msgid("HideWeapon"), BLOCK_SET);
-				set_msg_block(get_user_msgid("RoundTime"), BLOCK_SET);
-				set_task(0.1, "event_hud_reset", id);
-				m_dead_fl[id] = false;
-				m_setDeadFlagTime[id] = -1.0;
-				m_deadSeePlayer[id] = -1;
-					
-				dm_setSpawnPoint (id);
-			}
+			RoundCountDown ();
+			g_countDownTime = get_gametime () + 1.0;
 		}
 	}
-	else
-		firstSetting = false;
-	
+
 	if (g_dm_roundEnd && g_nextRoundMap != -1 && g_nextRoundTime <= get_gametime ())
 		server_cmd("changelevel %s", g_Nmap_name[g_nextRoundMap]);
-	
-	if (dm_game_play ())
-		server_cmd("sypb_gamemod %d", g_dmMode);
-	else
-		server_cmd("sypb_gamemod 3");
 }
 
 public fw_PlayerPreThink (id)
@@ -1210,6 +1227,41 @@ public dm_user_spawn(id)
 // ==================
 
 // Plug-in Function =======
+public CheckSyPBMode ()
+{
+	if (dm_game_play ())
+		server_cmd("sypb_gamemod %d", g_dmMode);
+	else
+		server_cmd("sypb_gamemod 3");
+}
+
+public RoundCountDown ()
+{
+	new countDownTime = g_startTime - floatround(get_gametime ());
+	client_print(0, print_center,"%L", LANG_PLAYER, "FREEZE_MSG", countDownTime);
+
+	if (countDownTime == 2)
+	{
+		for (new id = 1; id <= get_maxplayers(); id++)
+		{
+			if (!is_user_connected(id))
+					continue;
+
+			if (!is_user_alive(id))
+				continue;
+
+			set_msg_block(get_user_msgid("HideWeapon"), BLOCK_SET);
+			set_msg_block(get_user_msgid("RoundTime"), BLOCK_SET);
+			set_task(0.1, "event_hud_reset", id);
+			m_dead_fl[id] = false;
+			m_setDeadFlagTime[id] = -1.0;
+			m_deadSeePlayer[id] = -1;
+					
+			dm_setSpawnPoint (id);
+		}
+	}
+}
+
 public dm_enforcementSpawn(id)
 {
 	if (is_user_alive(id))
@@ -1325,16 +1377,26 @@ public dm_buyzone_addhp(id)
 // Dm Game end ==================
 public dm_game_end()
 {
+	g_dm_roundEnd = true;
 	g_nextRoundMap = -1;
-	while ( g_nextRoundMap == -1)
+	if (g_Nmap_NU == 0)
 	{
-		g_nextRoundMap = random_num(1, g_Nmap_NU);
-
-		new game_map[64];
-		format(game_map, charsmax(game_map), "maps/%s.bsp", g_Nmap_name[g_nextRoundMap]);
-		if (!file_exists(game_map))
-			g_nextRoundMap = -1;
+		g_nextRoundMap = 0;
+		get_mapname(g_Nmap_name[0], charsmax(g_Nmap_name));
 	}
+	else
+	{
+		while ( g_nextRoundMap == -1)
+		{
+			g_nextRoundMap = random_num(0, g_Nmap_NU - 1);
+
+			new game_map[64];
+			format(game_map, charsmax(game_map), "maps/%s.bsp", g_Nmap_name[g_nextRoundMap]);
+			if (!file_exists(game_map))
+				g_nextRoundMap = -1;
+		}
+	}
+
 
 	new sound[256]; 
 	if (g_dmMode == MODE_TDM)
@@ -1350,6 +1412,7 @@ public dm_game_end()
 	client_cmd(0, "spk ^"%s^"", sound);
 	
 	g_nextRoundTime = get_gametime () + 10.0;
+	CheckSyPBMode ();
 }
 
 // ===========================
@@ -1441,7 +1504,7 @@ public event_BuyZone(id)
 	static inBuyZone;
 	inBuyZone = read_data(1);
 	
-	if (m_in_buyzone[id] != inBuyZone)
+	if (g_BZAddHp && m_in_buyzone[id] != inBuyZone)
 	{
 		if (inBuyZone)
 			client_print(id, print_chat, "%L", id, "WILL_ADD_HP");
