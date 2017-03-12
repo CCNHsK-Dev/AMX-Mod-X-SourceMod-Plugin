@@ -15,7 +15,7 @@
 #include <hamsandwich>
 
 #define PLUGIN	"Deathmatch: Kill Duty"
-#define VERSION	"3.0.9.18"
+#define VERSION	"3.0.9.20"
 #define AUTHOR	"HsK-Dev Blog By CCN"
 
 new const MAX_BPAMMO[] = { -1, 52, -1, 90, 1, 32, 1, 100, 90, 1, 120, 100, 100, 90, 90, 90, 100, 120,
@@ -107,6 +107,7 @@ g_priweaponN[30][64], g_secweaponN[30][64];
 new g_bnweapon[2][3];  // Bot Nice Weapon (AK/M4...)
 
 // Player vars
+new m_delayPutinGame[33]; // Player Join the Game
 new m_in_buyzone[33]; // Is Buy Zone
 new m_player_kill[33]; // Player Kill [pdm]
 new m_killMSGIndex[33][2]; // For kill MSG
@@ -155,6 +156,7 @@ public plugin_init()
 
 	// Ham
 	RegisterHam(Ham_Killed, "player", "fw_PlayerKilled");
+	RegisterHam(Ham_Spawn, "player", "fw_PlayerSpawn");
 	RegisterHam(Ham_TakeDamage, "player", "fw_TakeDamage");
 	RegisterHam(Ham_TakeDamage, "player", "fw_TakeDamage_Post", 1);
 
@@ -463,7 +465,7 @@ public GetGameMap()
 public dm_adminSettingMenu(id)
 {
 	if (!(get_user_flags(id) & ACCESS_FLAG))
-		client_print(id, print_chat, "You Have not Admin Flags");
+		client_print(id, print_chat, "You Are not Admin");
 	else
 	{
 		static menu[250], len;
@@ -760,6 +762,22 @@ public fw_TakeDamage_Post(victim)
 
 	m_dmdamage[victim] = false;
 }
+
+
+public fw_PlayerSpawn (id)
+{
+	if (m_delayPutinGame[id] && fm_get_user_team (id))
+	{
+		new Float:origin[3];
+		for (new i = 0; i < 3; i++) origin[i] = 9999.0;
+		
+		set_pev(id, pev_origin, origin);
+		return HAM_SUPERCEDE;
+	}
+
+	return HAM_IGNORED;
+}
+
 // ================================== 
 
 // Forard Hook ==================
@@ -916,21 +934,23 @@ public fw_ClientKill()
 
 public fw_UpdateClientData(id, sendweapons, cd_handle)
 {
-	if (is_user_alive(id))
+	if (is_user_alive(id) || dm_user_tbot (id))
 		return FMRES_IGNORED;
 
 	new Float:gameTime = get_gametime ();
-	if (m_deadSeePlayerTime[id][1] == -1.0)
-		return FMRES_IGNORED;
+	if (!m_delayPutinGame[id])
+	{
+		if (m_deadSeePlayerTime[id][1] == -1.0)
+			return FMRES_IGNORED;
+				
+		if (m_deadSeePlayerTime[id][1] > gameTime && m_deadSeePlayerTime[id][0] < gameTime)
+			return FMRES_IGNORED;
 			
-	if (m_deadSeePlayerTime[id][1] > gameTime && m_deadSeePlayerTime[id][0] < gameTime)
-		return FMRES_IGNORED;
-		
-	if (m_deadSeePlayerTime[id][2] > gameTime)
-		return FMRES_IGNORED;
-		
+		if (m_deadSeePlayerTime[id][2] > gameTime)
+			return FMRES_IGNORED;
+	}
+	
 	set_cd(cd_handle, CD_iUser1, gameTime + 0.007);  
-
 	return FMRES_HANDLED;
 }
 // ================================== 
@@ -946,9 +966,12 @@ public dm_menu_weap(id)
 		dm_menu_pri_weap(id);
 		return;
 	}
-		
-	m_spawnMaxTime[id] = get_gametime () + g_spawnMaxTime;
-	client_print(id, print_center, "%L", id, "INEV_RES_MSG", g_spawnMaxTime);
+	
+	if (!m_delayPutinGame[id])
+	{
+		m_spawnMaxTime[id] = get_gametime () + g_spawnMaxTime;
+		client_print(id, print_center, "%L", id, "INEV_RES_MSG", g_spawnMaxTime);
+	}
 	
 	if (m_pri_weaponid[id] == 0 && m_sec_weaponid[id] == 0)
 	{
@@ -1173,6 +1196,8 @@ public dm_user_spawn(id)
 	if (team != 1 && team != 2)
 		return;
 
+	m_delayPutinGame[id] = false;
+		
 	if (!is_user_alive(id))
 	{
 		if (!dm_game_play())
@@ -1273,7 +1298,7 @@ public RoundCountDown ()
 			m_dead_fl[id] = false;
 			m_setDeadFlagTime[id] = -1.0;
 			m_deadSeePlayer[id] = -1;
-					
+
 			dm_setSpawnPoint (id);
 		}
 	}
@@ -1457,7 +1482,124 @@ public dm_game_end()
 
 // ===========================
 
+// Auto Join Game ===============
+public dm_playerPutin(id)
+{
+	m_delayPutinGame[id] = dm_game_play () ? true : false;
+	
+	if (m_delayPutinGame[id])
+		m_spawnTime[id] = get_gametime() + 2.0;
+	else
+		m_spawnTime[id] = get_gametime();
+}
+
+public message_show_menu(msgid, dest, id)
+{
+	static team_select[] = "#Team_Select";
+	static menu_text_code[sizeof team_select];
+	get_msg_arg_string(4, menu_text_code, sizeof menu_text_code - 1);
+	if (!equal(menu_text_code, team_select))
+		return PLUGIN_CONTINUE;
+
+	set_force_team_join_task(id, msgid);
+
+	return PLUGIN_HANDLED
+}
+
+public message_vgui_menu(msgid, dest, id)
+{
+	if (get_msg_arg_int(1) != 2)
+		return PLUGIN_CONTINUE;
+
+	set_force_team_join_task(id, msgid);
+
+	return PLUGIN_HANDLED
+}
+
+set_force_team_join_task(id, menu_msgid)
+{
+	static param_menu_msgid[2];
+	param_menu_msgid[0] = menu_msgid;
+	set_task(0.1, "task_force_team_join", id, param_menu_msgid, sizeof param_menu_msgid);
+}
+
+public task_force_team_join(menu_msgid[], id)
+{
+	if (fm_get_user_team(id))
+		return;
+
+	dm_force_team_join(id, menu_msgid[0]);
+}
+
+stock dm_force_team_join(id, menu_msgid, team[] = "5", class[] = "5")
+{
+	static jointeam[] = "jointeam";
+	if (class[0] == '0') {
+		engclient_cmd(id, jointeam, team);
+		dm_playerPutin(id);
+		return;
+	}
+
+	static msg_block, joinclass[] = "joinclass";
+	msg_block = get_msg_block(menu_msgid);
+	set_msg_block(menu_msgid, BLOCK_SET);
+	engclient_cmd(id, jointeam, team);
+	client_cmd(id, "%s %i", joinclass, class);
+	set_msg_block(menu_msgid, msg_block);
+	
+	dm_playerPutin(id);
+}
+// ==============
+
 // MSG Hook =========
+public client_disconnect (id)
+{
+	playerDataReset (id);
+}
+
+public client_putinserver(id)
+{
+	playerDataReset (id);
+	if (dm_user_tbot(id))
+	{
+		m_spawnTime[id] = get_gametime () + 3.0;
+
+		if (cvar_botquota && !g_hamczbots)
+			set_task(0.1, "register_ham_czbots", id);
+	}
+}
+
+public playerDataReset (id)
+{
+	m_delayPutinGame[id] = false;
+	m_in_buyzone[id] = false;
+	m_player_kill[id] = 0;	
+	m_killMSGIndex[id][0] = -1;
+	m_killMSGIndex[id][0] = -1;
+	
+	m_chosen_pri_weap[id] = false;
+	m_chosen_sec_weap[id] = false;
+	m_pri_weaponid[id] = 0;
+	m_sec_weaponid[id] = 0;
+	m_weaponSilen[id][0] = false;
+	m_weaponSilen[id][1] = false;
+	
+	m_deadSeePlayer[id] = -1;
+	m_dead_fl[id] = false;
+	m_dmdamage[id] = false;
+	
+	m_deadSeePlayerTime[id][0] = -1.0;
+	m_deadSeePlayerTime[id][1] = -1.0;
+	m_deadSeePlayerTime[id][2] = -1.0;
+	m_showHudMsgTime[id] = 0.0;
+	m_showKillMSGTime[id] = -1.0;
+	m_setDeadFlagTime[id] = -1.0;
+	m_spawnTime[id] = -1.0;
+	m_spawnMaxTime[id] = -1.0;
+	m_spawnGodTime[id] = -1.0;
+	m_buyzoneTime[id] = -1.0;
+}
+
 public clcmd_buy(id)
 	return PLUGIN_HANDLED;
 
@@ -1626,40 +1768,6 @@ public message_textmsg()
 	return PLUGIN_CONTINUE;
 }
 
-public client_putinserver(id)
-{
-	m_player_kill[id] = 0;	
-	m_killMSGIndex[id][0] = -1;
-	m_killMSGIndex[id][0] = -1;
-	
-	m_chosen_pri_weap[id] = false;
-	m_chosen_sec_weap[id] = false;
-	m_pri_weaponid[id] = 0;
-	m_sec_weaponid[id] = 0;
-	
-	m_weaponSilen[id][0] = false;
-	m_weaponSilen[id][1] = false;
-	
-	m_deadSeePlayer[id] = -1;
-	m_dead_fl[id] = false;
-	m_dmdamage[id] = false;
-	
-	m_showHudMsgTime[id] = 0.0;
-	m_deadSeePlayerTime[id][0] = -1.0;
-	m_deadSeePlayerTime[id][1] = -1.0;
-	m_deadSeePlayerTime[id][2] = -1.0;
-	m_showKillMSGTime[id] = -1.0;
-	m_setDeadFlagTime[id] = -1.0;
-	
-	if (dm_user_tbot(id))
-	{
-		m_spawnTime[id] = get_gametime () + 3.0;
-
-		if (cvar_botquota && !g_hamczbots)
-			set_task(0.1, "register_ham_czbots", id);
-	}
-}
-
 public register_ham_czbots(id)
 {
 	if (!is_user_connected(id) || !get_pcvar_num(cvar_botquota) || g_hamczbots)
@@ -1669,73 +1777,13 @@ public register_ham_czbots(id)
 		return;
 
 	RegisterHamFromEntity(Ham_Killed, id, "fw_PlayerKilled");
+	RegisterHamFromEntity(Ham_Spawn, id, "fw_PlayerSpawn");
 	RegisterHamFromEntity(Ham_TakeDamage, id, "fw_TakeDamage");
+	RegisterHamFromEntity(Ham_TakeDamage, id, "fw_TakeDamage_Post", 1);
 
 	g_hamczbots = true;
-	
-	server_print("***** [register_ham_czbots] *****")
 }
 // ==========
-
-// Auto Join Game ===============
-public message_show_menu(msgid, dest, id)
-{
-	static team_select[] = "#Team_Select";
-	static menu_text_code[sizeof team_select];
-	get_msg_arg_string(4, menu_text_code, sizeof menu_text_code - 1);
-	if (!equal(menu_text_code, team_select))
-		return PLUGIN_CONTINUE;
-
-	set_force_team_join_task(id, msgid);
-
-	return PLUGIN_HANDLED
-}
-
-public message_vgui_menu(msgid, dest, id)
-{
-	if (get_msg_arg_int(1) != 2)// || !should_autojoin(id))
-		return PLUGIN_CONTINUE;
-
-	set_force_team_join_task(id, msgid);
-
-	return PLUGIN_HANDLED
-}
-
-set_force_team_join_task(id, menu_msgid)
-{
-	static param_menu_msgid[2];
-	param_menu_msgid[0] = menu_msgid;
-	set_task(0.1, "task_force_team_join", id, param_menu_msgid, sizeof param_menu_msgid);
-}
-
-public task_force_team_join(menu_msgid[], id)
-{
-	if (fm_get_user_team(id))
-		return;
-
-	dm_force_team_join(id, menu_msgid[0]);
-}
-
-stock dm_force_team_join(id, menu_msgid, team[] = "5", class[] = "5")
-{
-	static jointeam[] = "jointeam";
-	if (class[0] == '0') {
-		engclient_cmd(id, jointeam, team);
-		dm_menu_weap(id);
-		return;
-	}
-
-	static msg_block, joinclass[] = "joinclass";
-	msg_block = get_msg_block(menu_msgid);
-	set_msg_block(menu_msgid, BLOCK_SET);
-	engclient_cmd(id, jointeam, team);
-	client_cmd(id, "%s %i", joinclass, class);
-	set_msg_block(menu_msgid, msg_block);
-	dm_menu_weap(id);
-
-	dm_setSpawnPoint (id);
-}
-// ==============
 
 SendDeathMsg(attacker, victim, const weapon[], hs)
 {
