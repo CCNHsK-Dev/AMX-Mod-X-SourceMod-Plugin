@@ -1,7 +1,7 @@
 
 /* 
 			DeathMatch: Kill Duty - Upgrade 2
-				16/3/2017 (Version: 3.1.0)
+				20/3/2017 (Version: 3.1.0)
 			
 					HsK-Dev Blog By CCN
 			
@@ -15,7 +15,7 @@
 #include <hamsandwich>
 
 #define PLUGIN	"Deathmatch: Kill Duty"
-#define VERSION	"3.0.9.20"
+#define VERSION	"3.0.9.21"
 #define AUTHOR	"HsK-Dev Blog By CCN"
 
 new const MAX_BPAMMO[] = { -1, 52, -1, 90, 1, 32, 1, 100, 90, 1, 120, 100, 100, 90, 90, 90, 100, 120,
@@ -508,7 +508,7 @@ public DM_BaseGameSetting()
 	g_CT_kill = 0;
 	g_nextRoundMap = -1;
 	
-	CheckSyPBMode ();
+	CheckSyPBMode (dm_game_play ());
 }
 
 //==========================
@@ -545,10 +545,10 @@ public event_round_start()
 	
 	for (new id = 1; id <= get_maxplayers(); id++)
 	{
-		if (!is_user_connected(id) || !is_user_alive(id))
+		if (!is_user_connected(id))
 			continue;
-
-		m_player_kill[id] = 0;
+			
+		playerDataReset (id, true);
 		dm_menu_weap(id);
 	}
 }
@@ -588,26 +588,33 @@ public logevent_round_start()
 	g_dm_roundEnd = false;
 	g_winIndex = -1;
 	
-	CheckSyPBMode ();
+	CheckSyPBMode (dm_game_play ());
 }
 // =====================
 
 // Hud Msg ==================
 public dm_showHudMsg(id)
-{
-	if (!g_dm_roundStart)
-		return;
-		
+{		
 	if (dm_user_tbot (id))
 		return;
-
+		
 	new hudMsg[256], msgPart;
 	msgPart = 0;
 		
-	if (g_dmMode == MODE_TDM)
-		msgPart += formatex(hudMsg[msgPart], sizeof hudMsg -1 - msgPart, "%L^n^n", id, "TEAM_KILL_MSG", g_CT_kill, g_TR_kill, g_MaxKill);
+	if (!g_dm_roundStart)
+	{
+		if (g_dmMode == MODE_TDM)
+			msgPart += formatex(hudMsg[msgPart], sizeof hudMsg -1 - msgPart, "%L^n^n", id, "TDM_KILL_MSG_READY");
+		else
+			msgPart += formatex(hudMsg[msgPart], sizeof hudMsg -1 - msgPart, " %L^n^n", id, "DM_KILL_MSG_READY");
+	}
 	else
-		msgPart += formatex(hudMsg[msgPart], sizeof hudMsg -1 - msgPart, " %L^n^n", id, "P_KILL_MSG", m_player_kill[id], g_MaxKill);
+	{
+		if (g_dmMode == MODE_TDM)
+			msgPart += formatex(hudMsg[msgPart], sizeof hudMsg -1 - msgPart, "%L^n^n", id, "TDM_KILL_MSG", g_MaxKill, g_CT_kill, g_TR_kill);
+		else
+			msgPart += formatex(hudMsg[msgPart], sizeof hudMsg -1 - msgPart, " %L^n^n", id, "DM_KILL_MSG", g_MaxKill, m_player_kill[id]);
+	}
 		
 	if (m_killMSGIndex[id][0] != -1 && m_showKillMSGTime[id] != -1.0 && m_showKillMSGTime[id] >= get_gametime ())
 	{
@@ -1269,9 +1276,9 @@ public dm_user_spawn(id)
 // ==================
 
 // Plug-in Function =======
-public CheckSyPBMode ()
+public CheckSyPBMode (gamePlay)
 {
-	if (dm_game_play ())
+	if (gamePlay)
 		server_cmd("sypb_gamemod %d", g_dmMode);
 	else
 		server_cmd("sypb_gamemod 3");
@@ -1280,7 +1287,7 @@ public CheckSyPBMode ()
 public RoundCountDown ()
 {
 	new countDownTime = g_startTime - floatround(get_gametime ());
-	client_print(0, print_center,"%L", LANG_PLAYER, "FREEZE_MSG", countDownTime);
+	client_print(0, print_center,"%L", LANG_PLAYER, "COUNTDOWN_MSG", countDownTime);
 
 	if (countDownTime == 2)
 	{
@@ -1302,6 +1309,9 @@ public RoundCountDown ()
 			dm_setSpawnPoint (id);
 		}
 	}
+	
+	if (countDownTime == 1)
+		CheckSyPBMode (1);
 }
 
 public dm_enforcementSpawn(id)
@@ -1477,7 +1487,7 @@ public dm_game_end()
 	client_cmd(0, "spk ^"%s^"", sound);
 	
 	g_nextRoundTime = get_gametime () + 10.0;
-	CheckSyPBMode ();
+	CheckSyPBMode (dm_game_play ());
 }
 
 // ===========================
@@ -1554,12 +1564,12 @@ stock dm_force_team_join(id, menu_msgid, team[] = "5", class[] = "5")
 // MSG Hook =========
 public client_disconnect (id)
 {
-	playerDataReset (id);
+	playerDataReset (id, false);
 }
 
 public client_putinserver(id)
 {
-	playerDataReset (id);
+	playerDataReset (id, false);
 	if (dm_user_tbot(id))
 	{
 		m_spawnTime[id] = get_gametime () + 3.0;
@@ -1569,9 +1579,20 @@ public client_putinserver(id)
 	}
 }
 
-public playerDataReset (id)
+public playerDataReset (id, newRound)
 {
-	m_delayPutinGame[id] = false;
+	if (!newRound)
+	{
+		m_delayPutinGame[id] = false;
+		
+		m_pri_weaponid[id] = 0;
+		m_sec_weaponid[id] = 0;
+		m_weaponSilen[id][0] = false;
+		m_weaponSilen[id][1] = false;
+		
+		m_showHudMsgTime[id] = 0.0;
+	}
+
 	m_in_buyzone[id] = false;
 	m_player_kill[id] = 0;	
 	m_killMSGIndex[id][0] = -1;
@@ -1579,11 +1600,7 @@ public playerDataReset (id)
 	
 	m_chosen_pri_weap[id] = false;
 	m_chosen_sec_weap[id] = false;
-	m_pri_weaponid[id] = 0;
-	m_sec_weaponid[id] = 0;
-	m_weaponSilen[id][0] = false;
-	m_weaponSilen[id][1] = false;
-	
+		
 	m_deadSeePlayer[id] = -1;
 	m_dead_fl[id] = false;
 	m_dmdamage[id] = false;
@@ -1591,7 +1608,6 @@ public playerDataReset (id)
 	m_deadSeePlayerTime[id][0] = -1.0;
 	m_deadSeePlayerTime[id][1] = -1.0;
 	m_deadSeePlayerTime[id][2] = -1.0;
-	m_showHudMsgTime[id] = 0.0;
 	m_showKillMSGTime[id] = -1.0;
 	m_setDeadFlagTime[id] = -1.0;
 	m_spawnTime[id] = -1.0;

@@ -1,7 +1,10 @@
 
 [en]
-TEAM_KILL_MSG = CT %d|%d TR /- MAX %d -/
-P_KILL_MSG = your kill %d /- MAX %d -/
+TDM_KILL_MSG_READY = Deathmatch: Kill Duty^nTeam Deathmatch Mode
+DM_KILL_MSG_READY = Deathmatch: Kill Duty^nDeathmatch Mode
+
+TDM_KILL_MSG = /- MAX %d -/^nCT %d|%d TR
+DM_KILL_MSG = /- MAX %d -/^nYour %d
 
 TR_WIN_MSG = !!TR WiN!! ^n Next Map is [%s]
 CT_WIN_MSG = !!CT WiN!! ^n Next Map is [%s]
@@ -25,7 +28,7 @@ MENU_BACK = Back
 MENU_NEXT = Next
 MENU_EXIT = Exit
 
-FREEZE_MSG = %d 's will strat game!
+COUNTDOWN_MSG = %d 's will strat game!
 
 TDM_KILLER_MSG = You Kill Player '%s', Your kill '%d' player
 DM_KILLER_MSG = You Kill Player '%s', Your kill '%d/%d' player
@@ -43,8 +46,11 @@ PDM_AIM_TEXT = Enemy
 ERROR_PDM = MAP[%s] have not spawns. this round is TDM Mod
 
 [tc]
-TEAM_KILL_MSG = CT %d|%d TR /- MAX %d -/
-P_KILL_MSG = your kill %d /- MAX %d -/
+TDM_KILL_MSG_READY = Deathmatch: Kill Duty^nTeam Deathmatch Mode
+DM_KILL_MSG_READY = Deathmatch: Kill Duty^nDeathmatch Mode
+
+TDM_KILL_MSG = /- MAX %d -/^nCT %d|%d TR
+DM_KILL_MSG = /- MAX %d -/^nYour %d
 
 TR_WIN_MSG = !!恐怖份子 勝利!! ^n 下一張地圖為 [%s]
 CT_WIN_MSG = !!反恐精英 勝利!! ^n 下一張地圖為 [%s]
@@ -68,7 +74,7 @@ MENU_BACK = 上一頁
 MENU_NEXT = 下一頁
 MENU_EXIT = 離開
 
-FREEZE_MSG = 遊戲在 %d 秒後開始
+COUNTDOWN_MSG = 遊戲在 %d 秒後開始
 
 TDM_KILLER_MSG = 你擊殺了玩家 '%s', 你共擊殺了 '%d' 位玩家
 DM_KILLER_MSG = 你擊殺了玩家 '%s', 你共擊殺了 '%d/%d' 位玩家
