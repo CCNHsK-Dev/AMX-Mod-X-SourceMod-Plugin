@@ -1,7 +1,7 @@
 
 /* 
 			DeathMatch: Kill Duty - Upgrade 2
-				20/3/2017 (Version: 3.1.0)
+				22/3/2017 (Version: 3.1.0)
 			
 					HsK-Dev Blog By CCN
 			
@@ -15,7 +15,7 @@
 #include <hamsandwich>
 
 #define PLUGIN	"Deathmatch: Kill Duty"
-#define VERSION	"3.0.9.21"
+#define VERSION	"3.0.9.22"
 #define AUTHOR	"HsK-Dev Blog By CCN"
 
 new const MAX_BPAMMO[] = { -1, 52, -1, 90, 1, 32, 1, 100, 90, 1, 120, 100, 100, 90, 90, 90, 100, 120,
@@ -1411,6 +1411,12 @@ public dm_DeathAction (id, hitzone, Float: gameTime)
 
 public GetWeaponSilen (id)
 {
+	if (dm_user_tbot (id))
+	{
+		m_weaponSilen[id][0] = (random_num (0, 1)) ? true : false;
+		m_weaponSilen[id][1] = (random_num (0, 1)) ? true : false;
+	}
+		
 	static weapons[32], num, i, weaponid;
 	num = 0;
 	get_user_weapons(id, weapons, num);
@@ -1587,8 +1593,8 @@ public playerDataReset (id, newRound)
 		
 		m_pri_weaponid[id] = 0;
 		m_sec_weaponid[id] = 0;
-		m_weaponSilen[id][0] = false;
-		m_weaponSilen[id][1] = false;
+		m_weaponSilen[id][0] = (dm_user_tbot(id)) ? (random_num (0, 1) ? true : false) : false;
+		m_weaponSilen[id][1] = (dm_user_tbot(id)) ? (random_num (0, 1) ? true : false) : false;
 		
 		m_showHudMsgTime[id] = 0.0;
 	}
@@ -1596,7 +1602,7 @@ public playerDataReset (id, newRound)
 	m_in_buyzone[id] = false;
 	m_player_kill[id] = 0;	
 	m_killMSGIndex[id][0] = -1;
-	m_killMSGIndex[id][0] = -1;
+	m_killMSGIndex[id][1] = -1;
 	
 	m_chosen_pri_weap[id] = false;
 	m_chosen_sec_weap[id] = false;
