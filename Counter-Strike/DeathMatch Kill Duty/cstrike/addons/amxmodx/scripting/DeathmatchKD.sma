@@ -15,7 +15,7 @@
 #include <hamsandwich>
 
 #define PLUGIN	"Deathmatch: Kill Duty"
-#define VERSION	"3.0.9.23"
+#define VERSION	"3.0.9.24"
 #define AUTHOR	"HsK-Dev Blog By CCN"
 
 new const MAX_BPAMMO[] = { -1, 52, -1, 90, 1, 32, 1, 100, 90, 1, 120, 100, 100, 90, 90, 90, 100, 120,
@@ -75,6 +75,9 @@ new g_dmMode = MODE_TDM; // DM MoD
 new bool:g_dm_roundStart; // DM Game Start
 new bool:g_dm_roundEnd; // DM Game End
 
+new g_gameTime[2]; // DM Game Time
+new Float:g_secondThinkTime; // Second Think
+
 new g_MaxKill; // Max Kill
 new g_CT_kill, g_TR_kill; // CT and TR Kill [tdm]
 new g_winIndex; // Win Team / Player Id
@@ -86,7 +89,6 @@ new g_spawnCount; // Spawan Point Num
 new Float:g_spawnPoint[128][3]; // Spawn Point Origin
 new Float:g_spawnAngles[128][3]; // Spawn Point Angles
 
-new Float:g_countDownTime; // Count Down Time
 new Float:g_spawnTime; // Player Respawn Time
 new Float:g_spawnGodTime; // Player Protect Time
 new Float:g_spawnMaxTime; // Player Enforcement Respawn Time
@@ -508,6 +510,9 @@ public DM_BaseGameSetting()
 	g_CT_kill = 0;
 	g_nextRoundMap = -1;
 	
+	g_gameTime[0] = 0;
+	g_gameTime[1] = 0;
+	
 	CheckSyPBMode (dm_game_play ());
 }
 
@@ -541,7 +546,7 @@ public event_round_start()
 	DM_BaseGameSetting ();
 	
 	g_startTime = g_startTimeData + floatround(get_gametime ());
-	g_countDownTime = get_gametime ();
+	g_secondThinkTime = get_gametime ();
 	
 	for (new id = 1; id <= get_maxplayers(); id++)
 	{
@@ -604,12 +609,13 @@ public dm_showHudMsg(id)
 	if (!g_dm_roundStart)
 	{
 		if (g_dmMode == MODE_TDM)
-			msgPart += formatex(hudMsg[msgPart], sizeof hudMsg -1 - msgPart, "%L^n^n", id, "TDM_KILL_MSG_READY");
+			msgPart += formatex(hudMsg[msgPart], sizeof hudMsg -1 - msgPart, "^n^n%L^n^n", id, "TDM_KILL_MSG_READY");
 		else
-			msgPart += formatex(hudMsg[msgPart], sizeof hudMsg -1 - msgPart, " %L^n^n", id, "DM_KILL_MSG_READY");
+			msgPart += formatex(hudMsg[msgPart], sizeof hudMsg -1 - msgPart, "^n^n %L^n^n", id, "DM_KILL_MSG_READY");
 	}
 	else
 	{
+		msgPart += formatex(hudMsg[msgPart], sizeof hudMsg -1 - msgPart, "%L^n^n", id, "GAMETIME_MSG", g_gameTime[1], g_gameTime[0]);
 		if (g_dmMode == MODE_TDM)
 			msgPart += formatex(hudMsg[msgPart], sizeof hudMsg -1 - msgPart, "%L^n^n", id, "TDM_KILL_MSG", g_MaxKill, g_CT_kill, g_TR_kill);
 		else
@@ -640,25 +646,25 @@ public dm_showHudMsg(id)
 		{
 			if (g_winIndex == 1)
 			{
-				set_hudmessage(150,100,0, -1.0, 0.24, 0, 6.0, 999.0, 0.1, 0.2, -1);
+				set_hudmessage(150,100,0, -1.0, 0.19, 0, 6.0, 999.0, 0.1, 0.2, -1);
 				msgPart += formatex(hudMsg[msgPart], sizeof hudMsg -1 - msgPart, "^n^n%L", id, "TR_WIN_MSG", g_Nmap_name[g_nextRoundMap]);
 			}
 			else
 			{
-				set_hudmessage(0,100,150, -1.0, 0.24, 0, 6.0, 999.0, 0.1, 0.2, -1);
+				set_hudmessage(0,100,150, -1.0, 0.19, 0, 6.0, 999.0, 0.1, 0.2, -1);
 				msgPart += formatex(hudMsg[msgPart], sizeof hudMsg -1 - msgPart, "^n^n%L", id, "CT_WIN_MSG", g_Nmap_name[g_nextRoundMap]);
 			}
 		}
 		else
 		{
-			set_hudmessage(50,150,50, -1.0, 0.24, 0, 6.0, 999.0, 0.1, 0.2, -1);
+			set_hudmessage(50,150,50, -1.0, 0.19, 0, 6.0, 999.0, 0.1, 0.2, -1);
 			new win_player[32];
 			get_user_name(g_winIndex, win_player, 31);
 			msgPart += formatex(hudMsg[msgPart], sizeof hudMsg -1 - msgPart, "^n^n%L", id, "PL_WIN_MSG", win_player, g_Nmap_name[g_nextRoundMap]);
 		}
 	}
 	else
-		set_hudmessage(0, 255, 0, -1.0, 0.24, 0, 6.0, 999.0, 0.1, 0.2, -1);
+		set_hudmessage(0, 255, 0, -1.0, 0.21, 0, 6.0, 999.0, 0.1, 0.2, -1);
 	
 	ShowSyncHudMsg(id, g_msgSync, hudMsg);
 
@@ -792,12 +798,20 @@ public fw_startFrame ()
 {
 	new Float:gameTime = get_gametime ();
 
-	if (!g_dm_roundStart)
+	if (g_secondThinkTime <= gameTime)
 	{
-		if (g_countDownTime <= gameTime)
-		{
+		g_secondThinkTime = gameTime + 1.0;
+		
+		if (!g_dm_roundStart)
 			RoundCountDown ();
-			g_countDownTime = gameTime + 1.0;
+		else
+		{
+			g_gameTime[0]++;
+			if (g_gameTime[0] == 60)
+			{
+				g_gameTime[0] = 0;
+				g_gameTime[1]++;
+			}
 		}
 	}
 

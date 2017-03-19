@@ -1,5 +1,7 @@
 
 [en]
+GAMETIME_MSG = GAME TIME %d:%2.2d
+
 TDM_KILL_MSG_READY = Deathmatch: Kill Duty^nTeam Deathmatch Mode
 DM_KILL_MSG_READY = Deathmatch: Kill Duty^nDeathmatch Mode
 
@@ -46,6 +48,8 @@ PDM_AIM_TEXT = Enemy
 ERROR_PDM = MAP[%s] have not spawns. this round is TDM Mod
 
 [tc]
+GAMETIME_MSG = GAME TIME %d:%2.2d
+
 TDM_KILL_MSG_READY = Deathmatch: Kill Duty^nTeam Deathmatch Mode
 DM_KILL_MSG_READY = Deathmatch: Kill Duty^nDeathmatch Mode
 
