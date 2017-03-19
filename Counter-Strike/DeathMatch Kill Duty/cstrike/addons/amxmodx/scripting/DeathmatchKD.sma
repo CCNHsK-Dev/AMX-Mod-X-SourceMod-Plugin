@@ -15,7 +15,7 @@
 #include <hamsandwich>
 
 #define PLUGIN	"Deathmatch: Kill Duty"
-#define VERSION	"3.0.9.22"
+#define VERSION	"3.0.9.23"
 #define AUTHOR	"HsK-Dev Blog By CCN"
 
 new const MAX_BPAMMO[] = { -1, 52, -1, 90, 1, 32, 1, 100, 90, 1, 120, 100, 100, 90, 90, 90, 100, 120,
@@ -790,16 +790,18 @@ public fw_PlayerSpawn (id)
 // Forard Hook ==================
 public fw_startFrame ()
 {
+	new Float:gameTime = get_gametime ();
+
 	if (!g_dm_roundStart)
 	{
-		if (g_countDownTime <= get_gametime ())
+		if (g_countDownTime <= gameTime)
 		{
 			RoundCountDown ();
-			g_countDownTime = get_gametime () + 1.0;
+			g_countDownTime = gameTime + 1.0;
 		}
 	}
 
-	if (g_dm_roundEnd && g_nextRoundMap != -1 && g_nextRoundTime <= get_gametime ())
+	if (g_dm_roundEnd && g_nextRoundMap != -1 && g_nextRoundTime <= gameTime)
 		server_cmd("changelevel %s", g_Nmap_name[g_nextRoundMap]);
 }
 
@@ -891,6 +893,7 @@ public fw_PlayerPreThink (id)
 		{
 			fm_set_user_godmode(id, 0);
 			fm_set_rendering(id, kRenderFxNone, 0, 0, 0,kRenderNormal, 255);
+			m_spawnGodTime[id] = -1.0;
 		}
 	}
 	else 
@@ -1223,7 +1226,7 @@ public dm_user_spawn(id)
 
 	set_msg_block(get_user_msgid("HideWeapon"), BLOCK_SET);
 	set_msg_block(get_user_msgid("RoundTime"), BLOCK_SET);
-	set_task(0.1, "event_hud_reset", id);
+	set_task(0.05, "event_hud_reset", id);
 	m_dead_fl[id] = false;
 	m_deadSeePlayer[id] = -1;
 	m_setDeadFlagTime[id] = -1.0;
@@ -1286,7 +1289,8 @@ public CheckSyPBMode (gamePlay)
 
 public RoundCountDown ()
 {
-	new countDownTime = g_startTime - floatround(get_gametime ());
+	new Float:gameTime = get_gametime ();
+	new countDownTime = g_startTime - floatround(gameTime);
 	client_print(0, print_center,"%L", LANG_PLAYER, "COUNTDOWN_MSG", countDownTime);
 
 	if (countDownTime == 2)
@@ -1301,12 +1305,13 @@ public RoundCountDown ()
 
 			set_msg_block(get_user_msgid("HideWeapon"), BLOCK_SET);
 			set_msg_block(get_user_msgid("RoundTime"), BLOCK_SET);
-			set_task(0.1, "event_hud_reset", id);
+			set_task(0.05, "event_hud_reset", id);
 			m_dead_fl[id] = false;
 			m_setDeadFlagTime[id] = -1.0;
 			m_deadSeePlayer[id] = -1;
 
 			dm_setSpawnPoint (id);
+			m_spawnGodTime[id] = gameTime + 2.5;
 		}
 	}
 	
@@ -1732,7 +1737,7 @@ public message_Money(msg_id, msg_dest, id)
 
 public message_AmmoX(msg_id, msg_dest, id)
 {
-	if (g_unlimitAmmo == false || !is_user_alive(id))
+	if (!is_user_alive(id) || g_unlimitAmmo == false)
 		return PLUGIN_CONTINUE;
 
 	if (get_msg_arg_int(1) >= sizeof AMMOID_WEAPON)
