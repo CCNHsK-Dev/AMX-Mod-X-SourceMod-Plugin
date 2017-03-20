@@ -1,12 +1,14 @@
 
 [en]
 GAMETIME_MSG = GAME TIME %d:%2.2d
+ROUNDTIME_MSG = ROUND TIME %d Min
 
 TDM_KILL_MSG_READY = Deathmatch: Kill Duty^nTeam Deathmatch Mode
 DM_KILL_MSG_READY = Deathmatch: Kill Duty^nDeathmatch Mode
 
-TDM_KILL_MSG = /- MAX %d -/^nCT %d|%d TR
-DM_KILL_MSG = /- MAX %d -/^nYour %d
+MAX_KILL_MSG = /- MAX %d -/
+TDM_KILL_MSG = CT %d|%d TR
+DM_KILL_MSG = Your %d
 
 TR_WIN_MSG = !!TR WiN!! ^n Next Map is [%s]
 CT_WIN_MSG = !!CT WiN!! ^n Next Map is [%s]
@@ -14,6 +16,7 @@ PL_WIN_MSG = !![%s] WiN!! ^n Next Map is [%s]
 
 TDM_GS_MSG = !!!Game StraT!!! TeaM MiX Kill IS: %d
 PDM_GS_MSG = !!!Game StraT!!! Player MiX Kill IS: %d
+GS_TIMEONLY_MSG = !!!Game StraT!!!
 
 INEV_RES_MSG = %.1f 's will spawn
 
@@ -49,12 +52,14 @@ ERROR_PDM = MAP[%s] have not spawns. this round is TDM Mod
 
 [tc]
 GAMETIME_MSG = GAME TIME %d:%2.2d
+ROUNDTIME_MSG = ROUND TIME %d Min
 
 TDM_KILL_MSG_READY = Deathmatch: Kill Duty^nTeam Deathmatch Mode
 DM_KILL_MSG_READY = Deathmatch: Kill Duty^nDeathmatch Mode
 
-TDM_KILL_MSG = /- MAX %d -/^nCT %d|%d TR
-DM_KILL_MSG = /- MAX %d -/^nYour %d
+MAX_KILL_MSG = /- MAX %d -/
+TDM_KILL_MSG = CT %d|%d TR
+DM_KILL_MSG = Your %d
 
 TR_WIN_MSG = !!恐怖份子 勝利!! ^n 下一張地圖為 [%s]
 CT_WIN_MSG = !!反恐精英 勝利!! ^n 下一張地圖為 [%s]
@@ -62,6 +67,7 @@ PL_WIN_MSG = !!玩家 [%s] 勝利!! ^n 下一張地圖為 [%s]
 
 TDM_GS_MSG = !!!遊戲開始!!! 團隊總殺數是 : %d
 PDM_GS_MSG = !!!遊戲開始!!! 個人總殺數是 : %d
+GS_TIMEONLY_MSG = !!!遊戲開始!!!
 
 INEV_RES_MSG = %.1f 秒後張被強制復活
 

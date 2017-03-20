@@ -15,7 +15,7 @@
 #include <hamsandwich>
 
 #define PLUGIN	"Deathmatch: Kill Duty"
-#define VERSION	"3.0.9.24"
+#define VERSION	"3.0.9.26"
 #define AUTHOR	"HsK-Dev Blog By CCN"
 
 new const MAX_BPAMMO[] = { -1, 52, -1, 90, 1, 32, 1, 100, 90, 1, 120, 100, 100, 90, 90, 90, 100, 120,
@@ -78,6 +78,7 @@ new bool:g_dm_roundEnd; // DM Game End
 new g_gameTime[2]; // DM Game Time
 new Float:g_secondThinkTime; // Second Think
 
+new g_gameMaxTime; // DM End Time (Min)
 new g_MaxKill; // Max Kill
 new g_CT_kill, g_TR_kill; // CT and TR Kill [tdm]
 new g_winIndex; // Win Team / Player Id
@@ -221,6 +222,7 @@ LoadDMKDSetting ()
 	g_giveGrenade[2] = false;
 	g_startTimeData = 10;
 	g_MaxKill = 0;
+	g_gameMaxTime = 20;
 	g_BZAddHp = true;
 	g_BZAddHpTime = 5.0;
 	g_BZAddHpAmounT = 10;
@@ -311,6 +313,7 @@ LoadDMSettingFile()
 				}
 				else if (equal(key, "Freeze Time")) g_startTimeData = str_to_num(value);
 				else if (equal(key, "Kill WiN")) g_MaxKill = str_to_num(value);
+				else if (equal(key, "Round Time")) g_gameMaxTime = str_to_num(value);
 				else if (equal(key, "Buyzone Add HP")) g_BZAddHp = str_to_bool(value);
 				else if (equal(key, "Buyzone Add HP Time")) g_BZAddHpTime = str_to_float(value);
 				else if (equal(key, "Buyzone Add HP Amount")) g_BZAddHpAmounT = str_to_num(value);
@@ -500,6 +503,9 @@ public DM_BaseGameSetting()
 
 	if (g_startTimeData < 5)
 		g_startTimeData = 5;
+		
+	if (g_gameMaxTime < 5)
+		g_gameMaxTime = 5;
 			
 	server_cmd("mp_freezetime %d", g_startTimeData);
 	server_cmd("mp_friendlyfire %d", g_dmMode);
@@ -565,7 +571,7 @@ public logevent_round_start()
 
 	if (g_dmMode == MODE_TDM)
 	{
-		if (g_MaxKill <= 0)
+		if (g_MaxKill == 0)
 		{
 			new maxKill = random_num(5, 7) * iNum;
 			maxKill /= 10;
@@ -574,11 +580,12 @@ public logevent_round_start()
 			g_MaxKill = maxKill;
 		}
 
-		client_print(0, print_center, "%L", LANG_PLAYER, "TDM_GS_MSG", g_MaxKill);
+		if (g_MaxKill > 0)
+			client_print(0, print_center, "%L", LANG_PLAYER, "TDM_GS_MSG", g_MaxKill);
 	}
 	else
 	{
-		if (g_MaxKill <= 0)
+		if (g_MaxKill == 0)
 		{
 			new maxKill = random_num(2, 3) * (iNum-1);
 			maxKill /= 10;
@@ -587,8 +594,16 @@ public logevent_round_start()
 			g_MaxKill = maxKill;
 		}
 			
-		client_print(0, print_center, "%L", LANG_PLAYER, "PDM_GS_MSG", g_MaxKill);
+		if (g_MaxKill > 0)
+			client_print(0, print_center, "%L", LANG_PLAYER, "PDM_GS_MSG", g_MaxKill);
 	}
+	
+	if (g_MaxKill <= 0)
+	{
+		g_MaxKill = -1;
+		client_print(0, print_center, "%L", LANG_PLAYER, "GS_TIMEONLY_MSG", g_MaxKill);
+	}
+	
 	g_dm_roundStart = true
 	g_dm_roundEnd = false;
 	g_winIndex = -1;
@@ -615,11 +630,16 @@ public dm_showHudMsg(id)
 	}
 	else
 	{
-		msgPart += formatex(hudMsg[msgPart], sizeof hudMsg -1 - msgPart, "%L^n^n", id, "GAMETIME_MSG", g_gameTime[1], g_gameTime[0]);
+		msgPart += formatex(hudMsg[msgPart], sizeof hudMsg -1 - msgPart, "%L^n", id, "GAMETIME_MSG", g_gameTime[1], g_gameTime[0]);
+		msgPart += formatex(hudMsg[msgPart], sizeof hudMsg -1 - msgPart, "%L^n^n", id, "ROUNDTIME_MSG", g_gameMaxTime);
+		
+		if (g_MaxKill > 0)
+			msgPart += formatex(hudMsg[msgPart], sizeof hudMsg -1 - msgPart, "%L^n", id, "MAX_KILL_MSG", g_MaxKill);
+		
 		if (g_dmMode == MODE_TDM)
-			msgPart += formatex(hudMsg[msgPart], sizeof hudMsg -1 - msgPart, "%L^n^n", id, "TDM_KILL_MSG", g_MaxKill, g_CT_kill, g_TR_kill);
+			msgPart += formatex(hudMsg[msgPart], sizeof hudMsg -1 - msgPart, "%L^n^n", id, "TDM_KILL_MSG", g_CT_kill, g_TR_kill);
 		else
-			msgPart += formatex(hudMsg[msgPart], sizeof hudMsg -1 - msgPart, " %L^n^n", id, "DM_KILL_MSG", g_MaxKill, m_player_kill[id]);
+			msgPart += formatex(hudMsg[msgPart], sizeof hudMsg -1 - msgPart, " %L^n^n", id, "DM_KILL_MSG", m_player_kill[id]);
 	}
 		
 	if (m_killMSGIndex[id][0] != -1 && m_showKillMSGTime[id] != -1.0 && m_showKillMSGTime[id] >= get_gametime ())
@@ -646,18 +666,18 @@ public dm_showHudMsg(id)
 		{
 			if (g_winIndex == 1)
 			{
-				set_hudmessage(150,100,0, -1.0, 0.19, 0, 6.0, 999.0, 0.1, 0.2, -1);
+				set_hudmessage(150,100,0, -1.0, 0.18, 0, 6.0, 999.0, 0.1, 0.2, -1);
 				msgPart += formatex(hudMsg[msgPart], sizeof hudMsg -1 - msgPart, "^n^n%L", id, "TR_WIN_MSG", g_Nmap_name[g_nextRoundMap]);
 			}
 			else
 			{
-				set_hudmessage(0,100,150, -1.0, 0.19, 0, 6.0, 999.0, 0.1, 0.2, -1);
+				set_hudmessage(0,100,150, -1.0, 0.18, 0, 6.0, 999.0, 0.1, 0.2, -1);
 				msgPart += formatex(hudMsg[msgPart], sizeof hudMsg -1 - msgPart, "^n^n%L", id, "CT_WIN_MSG", g_Nmap_name[g_nextRoundMap]);
 			}
 		}
 		else
 		{
-			set_hudmessage(50,150,50, -1.0, 0.19, 0, 6.0, 999.0, 0.1, 0.2, -1);
+			set_hudmessage(50,150,50, -1.0, 0.18, 0, 6.0, 999.0, 0.1, 0.2, -1);
 			new win_player[32];
 			get_user_name(g_winIndex, win_player, 31);
 			msgPart += formatex(hudMsg[msgPart], sizeof hudMsg -1 - msgPart, "^n^n%L", id, "PL_WIN_MSG", win_player, g_Nmap_name[g_nextRoundMap]);
@@ -716,7 +736,7 @@ public fw_PlayerKilled(victim, attacker, shouldgib)
 			if (fm_get_user_team(victim) == 1) g_CT_kill += 1;
 			else if (fm_get_user_team(victim) == 2) g_TR_kill += 1;
 
-			if (g_CT_kill >= g_MaxKill || g_TR_kill >= g_MaxKill)
+			if (g_MaxKill > 0 && (g_CT_kill >= g_MaxKill || g_TR_kill >= g_MaxKill))
 			{
 				g_winIndex = fm_get_user_team (attacker);
 				dm_game_end();
@@ -728,7 +748,7 @@ public fw_PlayerKilled(victim, attacker, shouldgib)
 		if (g_dmModeKillerAddHP > 0)
 			fm_set_user_health(attacker, min(fm_get_user_health(attacker) + g_dmModeKillerAddHP, 100));
 
-		if (m_player_kill[attacker] >= g_MaxKill)
+		if (g_MaxKill > 0 && m_player_kill[attacker] >= g_MaxKill)
 		{
 			g_winIndex = attacker;
 			dm_game_end();
@@ -804,13 +824,44 @@ public fw_startFrame ()
 		
 		if (!g_dm_roundStart)
 			RoundCountDown ();
-		else
+		else if (dm_game_play ())
 		{
 			g_gameTime[0]++;
 			if (g_gameTime[0] == 60)
 			{
 				g_gameTime[0] = 0;
 				g_gameTime[1]++;
+			}
+			
+			if (g_gameTime[1] >= g_gameMaxTime)
+			{
+				if (g_dmMode == MODE_TDM)
+				{
+					if (g_TR_kill > g_CT_kill)
+						g_winIndex = 1;
+					else if (g_CT_kill > g_TR_kill)
+						g_winIndex = 2;
+
+					if (g_winIndex != -1)
+						dm_game_end ();
+				}
+				else
+				{
+					new maxKill = 0;
+					for (new id = 1; id <= get_maxplayers(); id++)
+					{
+						if (!is_user_connected(id))
+							continue;
+							
+						if (m_player_kill[id] <= maxKill)
+							continue;
+							
+						maxKill = m_player_kill[id];
+						g_winIndex = id;
+					}
+					
+					dm_game_end ();
+				}
 			}
 		}
 	}
@@ -1403,7 +1454,7 @@ public dm_DeathAction (id, hitzone, Float: gameTime)
 	}
 
 	new deadSequence = random_num (101, 109);
-	if ((pev(id, pev_flags) & FL_DUCKING))
+	if ((pev(id, pev_flags) & FL_DUCKING) && pev(id, pev_flags) & (FL_ONGROUND | FL_PARTIALGROUND))
 		deadSequence = 110;
 	else
 	{
@@ -1496,7 +1547,6 @@ public dm_game_end()
 				g_nextRoundMap = -1;
 		}
 	}
-
 
 	new sound[256]; 
 	if (g_dmMode == MODE_TDM)
