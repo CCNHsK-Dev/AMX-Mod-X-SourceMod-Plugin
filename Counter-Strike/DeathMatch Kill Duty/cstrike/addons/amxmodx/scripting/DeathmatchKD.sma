@@ -15,7 +15,7 @@
 #include <hamsandwich>
 
 #define PLUGIN	"Deathmatch: Kill Duty"
-#define VERSION	"3.0.9.26"
+#define VERSION	"3.0.9.27"
 #define AUTHOR	"HsK-Dev Blog By CCN"
 
 new const MAX_BPAMMO[] = { -1, 52, -1, 90, 1, 32, 1, 100, 90, 1, 120, 100, 100, 90, 90, 90, 100, 120,
@@ -81,6 +81,7 @@ new Float:g_secondThinkTime; // Second Think
 new g_gameMaxTime; // DM End Time (Min)
 new g_MaxKill; // Max Kill
 new g_CT_kill, g_TR_kill; // CT and TR Kill [tdm]
+new g_topKiller[2]; // Top Killer [0=ID/1=Kill Num]
 new g_winIndex; // Win Team / Player Id
 
 new g_Nmap_NU, g_Nmap_name[256][32], g_nextRoundMap; // Next Map
@@ -516,6 +517,9 @@ public DM_BaseGameSetting()
 	g_CT_kill = 0;
 	g_nextRoundMap = -1;
 	
+	g_topKiller[0] = -1;
+	g_topKiller[1] = 0;
+	
 	g_gameTime[0] = 0;
 	g_gameTime[1] = 0;
 	
@@ -639,7 +643,17 @@ public dm_showHudMsg(id)
 		if (g_dmMode == MODE_TDM)
 			msgPart += formatex(hudMsg[msgPart], sizeof hudMsg -1 - msgPart, "%L^n^n", id, "TDM_KILL_MSG", g_CT_kill, g_TR_kill);
 		else
-			msgPart += formatex(hudMsg[msgPart], sizeof hudMsg -1 - msgPart, " %L^n^n", id, "DM_KILL_MSG", m_player_kill[id]);
+		{
+			msgPart += formatex(hudMsg[msgPart], sizeof hudMsg -1 - msgPart, " %L^n", id, "DM_KILL_MSG", m_player_kill[id]);
+			if (g_topKiller[0] != -1)
+			{
+				new playerName[32];
+				get_user_name(g_topKiller[0], playerName, 31);
+				msgPart += formatex(hudMsg[msgPart], sizeof hudMsg -1 - msgPart, " %L^n^n", id, "DM_TOPKILLER_MSG", playerName, g_topKiller[1]);
+			}
+			else
+				msgPart += formatex(hudMsg[msgPart], sizeof hudMsg -1 - msgPart, "^n");
+		}
 	}
 		
 	if (m_killMSGIndex[id][0] != -1 && m_showKillMSGTime[id] != -1.0 && m_showKillMSGTime[id] >= get_gametime ())
@@ -648,10 +662,10 @@ public dm_showHudMsg(id)
 		get_user_name(m_killMSGIndex[id][0], playerName, 31);
 		if (m_killMSGIndex[id][1] == 0)
 			msgPart += formatex(hudMsg[msgPart], sizeof hudMsg -1 - msgPart, "%L", id, "DM_DEAD_MSG", playerName);
-		else if (g_dmMode == MODE_TDM)
-			msgPart += formatex(hudMsg[msgPart], sizeof hudMsg -1 - msgPart, "%L", id, "TDM_KILLER_MSG", playerName, m_player_kill[id]);
-		else
+		else if (g_dmMode == MODE_DM && g_MaxKill > 0)
 			msgPart += formatex(hudMsg[msgPart], sizeof hudMsg -1 - msgPart, "%L", id, "DM_KILLER_MSG", playerName, m_player_kill[id], g_MaxKill);
+		else	
+			msgPart += formatex(hudMsg[msgPart], sizeof hudMsg -1 - msgPart, "%L", id, "TDM_KILLER_MSG", playerName, m_player_kill[id]);
 	}
 	else
 	{
@@ -728,6 +742,12 @@ public fw_PlayerKilled(victim, attacker, shouldgib)
 	SendDeathMsg(attacker, victim, weapon_msgname[weapon], (hitzone == 1) ? 1 : 0);
 
 	m_player_kill[attacker] += 1;
+	
+	if (m_player_kill[attacker] > g_topKiller[1])
+	{
+		g_topKiller[0] = attacker;
+		g_topKiller[1] = m_player_kill[attacker];
+	}
 	
 	if (g_dmMode == MODE_TDM)
 	{
@@ -847,19 +867,7 @@ public fw_startFrame ()
 				}
 				else
 				{
-					new maxKill = 0;
-					for (new id = 1; id <= get_maxplayers(); id++)
-					{
-						if (!is_user_connected(id))
-							continue;
-							
-						if (m_player_kill[id] <= maxKill)
-							continue;
-							
-						maxKill = m_player_kill[id];
-						g_winIndex = id;
-					}
-					
+					g_winIndex = g_topKiller[0];
 					dm_game_end ();
 				}
 			}

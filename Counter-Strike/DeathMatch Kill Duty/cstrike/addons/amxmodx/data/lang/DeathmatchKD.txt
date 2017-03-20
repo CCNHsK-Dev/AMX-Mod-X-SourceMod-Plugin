@@ -10,6 +10,8 @@ MAX_KILL_MSG = /- MAX %d -/
 TDM_KILL_MSG = CT %d|%d TR
 DM_KILL_MSG = Your %d
 
+DM_TOPKILLER_MSG = Top Killer '%s' ^nKill '%d' Player
+
 TR_WIN_MSG = !!TR WiN!! ^n Next Map is [%s]
 CT_WIN_MSG = !!CT WiN!! ^n Next Map is [%s]
 PL_WIN_MSG = !![%s] WiN!! ^n Next Map is [%s]
@@ -89,6 +91,8 @@ COUNTDOWN_MSG = 遊戲在 %d 秒後開始
 TDM_KILLER_MSG = 你擊殺了玩家 '%s', 你共擊殺了 '%d' 位玩家
 DM_KILLER_MSG = 你擊殺了玩家 '%s', 你共擊殺了 '%d/%d' 位玩家
 DM_DEAD_MSG = 玩家 '%s' 擊殺了你
+
+DM_TOPKILLER_MSG = Top Killer '%s' ^n共擊殺了 '%d' 位玩家
 
 WILL_ADD_HP = [DM: KD] 你在購買區, 張會補充血量!
 WILL_NOT_ADD_HP = [DM: KD] 你離開購買區...
