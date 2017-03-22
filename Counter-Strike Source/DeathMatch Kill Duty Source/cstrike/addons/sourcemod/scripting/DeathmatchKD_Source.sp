@@ -1,8 +1,26 @@
 
+/* 
+			DeathMatch: Kill Duty Source - Upgrade 1
+				xx/3/2017 (Version: 2.0)
+			
+					HsK-Dev Blog By CCN
+			
+			http://ccnhsk-dev.blogspot.com/
+*/
+
 #include <sourcemod>
 #include <cstrike>
 #include <sdkhooks>
 #include <sdktools>
+
+public Plugin:myinfo = 
+{
+	name = "DeathMatch: Kill Duty Source",
+	author = "HsK-Dev Blog By CCN",
+	description = "Deathmatch: Kill Duty Source",
+	version = "2.0.0.1",
+	url = "http://ccnhsk-dev.blogspot.com/"
+};
 
 // Block hostage and c4 [reference amxx plugin]
 new const String:OBJECTIVE_ENTITYS[][] = { "func_vehicleclip", "func_buyzone", "func_hostage_rescue", "func_bomb_target", 
@@ -45,15 +63,6 @@ String:g_priweaponN[30][512], String:g_secweaponN[30][512];
 // Game Offset
 new g_iAccount;
 
-public Plugin:myinfo = 
-{
-	name = "DeathMatch: Kill Duty - Source",
-	author = "HsK",
-	description = "Deathmatch: Kill Duty (Source)",
-	version = "1.0",
-	url = "http://www.youtube.com/user/mikeg234bbq"  /* This is my youtube acc */
-};
-
 public OnPluginStart()
 {
 	RegConsoleCmd("say", Command_DmSet);
@@ -69,7 +78,7 @@ public OnPluginStart()
 	AddCommandListener(Command_ChangeTeam, "jointeam");
 	AddCommandListener(Command_ChangeTeam, "chooseteam");
 
-	g_iAccount = FindSendPropOffs("CCSPlayer", "m_iAccount");
+	g_iAccount = FindSendPropInfo("CCSPlayer", "m_iAccount");
 }
 
 public OnConfigsExecuted()
@@ -725,7 +734,7 @@ public Set_BpAmmo(client) // Set Bp ammo, i order in amxx plug-in..
 
 	if (g_AmmoOffset[weaponID] == 0) return;
 
-	ammo_offset = FindDataMapOffs(client, "m_iAmmo")+(g_AmmoOffset[weaponID]*4);
+	ammo_offset = FindDataMapInfo(client, "m_iAmmo")+(g_AmmoOffset[weaponID]*4);
 	if (GetEntData(client, ammo_offset) == g_BpAmmo[weaponID]) return;
 
 	SetEntData(client, ammo_offset, g_BpAmmo[weaponID]);
@@ -736,7 +745,7 @@ get_user_bot(client) // Beacuse i know bot steam id is 'BOT'
 	if (!client || !IsClientConnected(client) || !IsClientInGame(client)) return false;
 
 	new String:SteamID[50];
-	GetClientAuthString(client, SteamID, sizeof(SteamID));
+	GetClientAuthId(client, AuthId_Steam3, SteamID, sizeof(SteamID));
 
 	if (StrEqual(SteamID, "BOT")) return true;
 	else return false;
