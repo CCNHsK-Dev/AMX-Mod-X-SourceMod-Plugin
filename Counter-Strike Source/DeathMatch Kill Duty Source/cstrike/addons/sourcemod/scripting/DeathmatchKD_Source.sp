@@ -18,9 +18,12 @@ public Plugin:myinfo =
 	name = "DeathMatch: Kill Duty Source",
 	author = "HsK-Dev Blog By CCN",
 	description = "Deathmatch: Kill Duty Source",
-	version = "2.0.0.1",
+	version = "2.0.0.2",
 	url = "http://ccnhsk-dev.blogspot.com/"
 };
+
+#define MODE_TDM                0
+#define MODE_DM                 1
 
 // Block hostage and c4 [reference amxx plugin]
 new const String:OBJECTIVE_ENTITYS[][] = { "func_vehicleclip", "func_buyzone", "func_hostage_rescue", "func_bomb_target", 
@@ -36,29 +39,31 @@ new const g_AmmoOffset[] = { 0, 9, 6, 2, 0, 7, 0, 8, 2, 0, 6, 0, 8, 3, 3, 3, 8, 
 new const g_BpAmmo[] = { -1, 52, 120, 100, 1, 32, 1, 100, 90, 1, 120, -1, 100, 90, 90, 90, 100, 30,  120, 200, 32, 90, 120, 90, 2, 35, 90, 90, -1, 100 }
 
 // Game vars
-new g_dm_mod = -1; // DM MoD
+new g_dmMode = -1; // DM MoD
 new bool:dm_game = false; // DM Game
-new Float:g_spawn_time; // Player Respawn Time
-new Float:g_protect_time; // Player Protect Time
-new g_redropp_weapon; // Remove Dropped Weapon
-new g_block_kill; // Block player Suicide
-new g_unlimitbp_ammo; // Unlimited Ammo(Magazine)
-new g_spawn_grenade[3]; // Give Grenade
-new Float:g_spawns[128][3], g_spawnCount; // Ran Spawn set
-new g_MaxKill = 0; // Max Kill
-new CT_kill, TR_kill; // CT and TR Kill [tdm]
-new g_mapsCount, String:g_mapname[64][128];// Ran MAP set
+new g_maxKill = 0; // Max Kill
+new g_teamCTKill, g_teamTRKill; // CT and TR Kill [tdm]
 
-// Player vars
-new g_pri_weaponid[MAXPLAYERS + 1],  g_sec_weaponid[MAXPLAYERS + 1]; // Is Weap set
-new g_Protection[MAXPLAYERS + 1]; // Is Protect 
-new bool:g_inser_menu[MAXPLAYERS + 1] = false; // New Player put in ser menu
-new bool:g_dmdamage[MAXPLAYERS + 1]; // DM Damage
-new g_player_kill[MAXPLAYERS + 1]; // Player Kill [pdm]
+new Float:g_spawnTime; // Player Respawn Time
+new Float:g_spawnGodTime; // Player Protect Time
+new g_ammoUnlimitbp; // Unlimited Ammo(Magazine)
+new g_removeDropWeapon; // Remove Dropped Weapon
+new g_blockKill; // Block player Suicide
+
+// Maps & Spawn Point
+new g_mapsCount, String:g_mapsName[64][128];// Ran MAP set
+new Float:g_spawns[128][3], g_spawnCount; // Ran Spawn set
 
 // Weapon Menu 
+new g_spawnGetGrenade[3]; // Give Grenade
 new g_priweapon, g_secweapon, g_priweaponID[30], g_secweaponID[30], 
-String:g_priweaponN[30][512], String:g_secweaponN[30][512];
+String:g_priweaponName[30][512], String:g_secweaponName[30][512];
+
+// Player vars
+new m_priWeaponID[MAXPLAYERS + 1],  m_secWeaponID[MAXPLAYERS + 1]; // Is Weap set
+new bool:m_godMode[MAXPLAYERS + 1]; // Is Protect 
+new bool:m_dmdamage[MAXPLAYERS + 1]; // DM Damage
+new m_playerKill[MAXPLAYERS + 1]; // Player Kill [pdm]
 
 // Game Offset
 new g_iAccount;
@@ -83,28 +88,28 @@ public OnPluginStart()
 
 public OnConfigsExecuted()
 {
-	g_dm_mod = -1;
+	g_dmMode = -1;
 	dm_game = false;
 	for (new i = 0; i < 128; i++)
 		g_spawns[i][0] = 0.0, g_spawns[i][1] = 0.0, g_spawns[i][2] = 0.0;
 	g_spawnCount = 0;
-	g_MaxKill = 0, CT_kill = 0, TR_kill = 0;
+	g_maxKill = 0, g_teamCTKill = 0, g_teamTRKill = 0;
 
 	for (new id = 1; id <= MAX_NAME_LENGTH; id++)
 	{
-		g_pri_weaponid[id] = 0, g_sec_weaponid[id] = 0;
-		g_Protection[id] = 0;
-		g_inser_menu[id] = false, g_dmdamage[id] = false;
-		g_player_kill[id] = 0;
+		m_priWeaponID[id] = 0, m_secWeaponID[id] = 0;
+		m_godMode[id] = false;
+		m_dmdamage[id] = false;
+		m_playerKill[id] = 0;
 
 		SDKUnhook(id, SDKHook_OnTakeDamage, SDK_TakeDamage);
 		SDKUnhook(id, SDKHook_OnTakeDamagePost, SDK_TakeDamagePost);
 		SDKUnhook(id, SDKHook_PreThink, SDK_PreThink);
 	}
 
-	load_dmsetting();
-	load_ranspawn();
-	load_ranmaps();
+	LoadDMSettingFile();
+	LoadRandomSpawnFile();
+	LoadRandomMapsFile();
 
 	ServerCommand("mp_timelimit 0");
 }
@@ -112,10 +117,10 @@ public OnConfigsExecuted()
 // Player Disconnect remove vars ====
 public OnClientDisconnect(client)
 {
-	g_pri_weaponid[client] = 0, g_sec_weaponid[client] = 0;
-	g_Protection[client] = 0;
-	g_inser_menu[client] = false, g_dmdamage[client] = false;
-	g_player_kill[client] = 0;
+	m_priWeaponID[client] = 0, m_secWeaponID[client] = 0;
+	m_godMode[client] = false;
+	m_dmdamage[client] = false;
+	m_playerKill[client] = 0;
 
 	SDKUnhook(client, SDKHook_OnTakeDamage, SDK_TakeDamage);
 	SDKUnhook(client, SDKHook_OnTakeDamagePost, SDK_TakeDamagePost);
@@ -124,7 +129,7 @@ public OnClientDisconnect(client)
 // ==================================
 
 // DM:KD-S Setting =========
-public load_dmsetting()
+public LoadDMSettingFile()
 {
 	new String:path[255];
 	Format(path, sizeof(path), "cfg/DmKD-S/DeathmatchKD-S_Setting.cfg");
@@ -157,28 +162,28 @@ public load_dmsetting()
 				TrimString(Setting_value[0]);
 				TrimString(Setting_value[1]);
 
-				if(!strcmp(Setting_value[0], "DM MoD", false)) g_dm_mod = StringToInt(Setting_value[1]);
-				else if(!strcmp(Setting_value[0], "Player Respawn Time", false)) g_spawn_time = StringToFloat(Setting_value[1]);
-				else if(!strcmp(Setting_value[0], "Player Protect Time", false)) g_protect_time = StringToFloat(Setting_value[1]);
-				else if(!strcmp(Setting_value[0], "Remove Dropped Weapon", false)) g_redropp_weapon = StringToInt(Setting_value[1]);
-				else if(!strcmp(Setting_value[0], "Block Player Suicide", false)) g_block_kill = StringToInt(Setting_value[1]);
-				else if(!strcmp(Setting_value[0], "Unlimited Ammo", false)) g_unlimitbp_ammo = StringToInt(Setting_value[1]);
+				if(!strcmp(Setting_value[0], "DM MoD", false)) g_dmMode = StringToInt(Setting_value[1]);
+				else if(!strcmp(Setting_value[0], "Player Respawn Time", false)) g_spawnTime = StringToFloat(Setting_value[1]);
+				else if(!strcmp(Setting_value[0], "Player Protect Time", false)) g_spawnGodTime = StringToFloat(Setting_value[1]);
+				else if(!strcmp(Setting_value[0], "Remove Dropped Weapon", false)) g_removeDropWeapon = StringToInt(Setting_value[1]);
+				else if(!strcmp(Setting_value[0], "Block Player Suicide", false)) g_blockKill = StringToInt(Setting_value[1]);
+				else if(!strcmp(Setting_value[0], "Unlimited Ammo", false)) g_ammoUnlimitbp = StringToInt(Setting_value[1]);
 				else if(!strcmp(Setting_value[0], "Give Grenade (hegrenade, flashbang, smokegrenade)", false)) 
 				{
 					new String:grenade_class[3][10];
 					ExplodeString(Setting_value[1], ",", grenade_class, 3, 10);
-					g_spawn_grenade[0] = StringToInt(grenade_class[0]);
-					g_spawn_grenade[1] = StringToInt(grenade_class[1]);
-					g_spawn_grenade[2] = StringToInt(grenade_class[2]);
+					g_spawnGetGrenade[0] = StringToInt(grenade_class[0]);
+					g_spawnGetGrenade[1] = StringToInt(grenade_class[1]);
+					g_spawnGetGrenade[2] = StringToInt(grenade_class[2]);
 				}
-				else if(!strcmp(Setting_value[0], "Kill WiN", false)) g_MaxKill = StringToInt(Setting_value[1]);
+				else if(!strcmp(Setting_value[0], "Kill WiN", false)) g_maxKill = StringToInt(Setting_value[1]);
 			}
 			case 2: 
 			{
 				ExplodeString(linedata, ",", weapon_get, 2, 256);
 
 				g_priweaponID[g_priweapon] = get_user_weapon_id(weapon_get[0]);
-				g_priweaponN[g_priweapon] = weapon_get[1];
+				g_priweaponName[g_priweapon] = weapon_get[1];
 				g_priweapon += 1;
 			}
 			case 3: 
@@ -186,7 +191,7 @@ public load_dmsetting()
 				ExplodeString(linedata, ",", weapon_get, 2, 256);
 
 				g_secweaponID[g_secweapon] = get_user_weapon_id(weapon_get[0]);
-				g_secweaponN[g_secweapon] = weapon_get[1];
+				g_secweaponName[g_secweapon] = weapon_get[1];
 				g_secweapon += 1;
 			}
 		}
@@ -196,11 +201,11 @@ public load_dmsetting()
 // ================================
 
 // Ran Spawn Save/Load ====
-public load_ranspawn()
+public LoadRandomSpawnFile()
 {
-	new String:path[255], String:g_MapName[128];
-	GetCurrentMap(g_MapName, sizeof(g_MapName));
-	Format(path, sizeof(path), "cfg/DmKD-S/spawn/%s.cfg", g_MapName);
+	new String:path[255], String:mapName[128];
+	GetCurrentMap(mapName, sizeof(mapName));
+	Format(path, sizeof(path), "cfg/DmKD-S/spawn/%s.cfg", mapName);
 
 	new Handle:file = OpenFile(path, "rt");
 	if (file == INVALID_HANDLE) return;
@@ -225,9 +230,9 @@ public load_ranspawn()
 
 public save_ranspawn(client)
 {
-	new String:path[255], String:g_MapName[128], Float:Player_Origin[3], String:Save_path[254];
-	GetCurrentMap(g_MapName, sizeof(g_MapName));
-	Format(path, sizeof(path), "cfg/DmKD-S/spawn/%s.cfg", g_MapName);
+	new String:path[255], String:mapName[128], Float:Player_Origin[3], String:Save_path[254];
+	GetCurrentMap(mapName, sizeof(mapName));
+	Format(path, sizeof(path), "cfg/DmKD-S/spawn/%s.cfg", mapName);
 
 	GetEntPropVector(client, Prop_Send, "m_vecOrigin", Player_Origin);
 	Format(Save_path, sizeof(Save_path), "%f %f %f", Player_Origin[0], Player_Origin[1], Player_Origin[2]);
@@ -241,7 +246,7 @@ public save_ranspawn(client)
 // =====================
 
 // Next Maps =========================
-public load_ranmaps()
+public LoadRandomMapsFile()
 {
 	new String:path[255];
 	Format(path, sizeof(path), "cfg/DmKD-S/maps.cfg");
@@ -255,9 +260,9 @@ public load_ranmaps()
 	while (!IsEndOfFile(file) && ReadFileLine(file, linedata, sizeof(linedata)))
 	{
 		g_mapsCount++;
-		g_mapname[g_mapsCount] = linedata;
+		g_mapsName[g_mapsCount] = linedata;
 
-		if (g_mapsCount >= sizeof g_mapname) break;
+		if (g_mapsCount >= sizeof g_mapsName) break;
 	}
 
 	CloseHandle(file);
@@ -271,8 +276,7 @@ public OnClientPutInServer(client)
 	SDKHook(client, SDKHook_OnTakeDamagePost, SDK_TakeDamagePost);
 	SDKHook(client, SDKHook_PreThink, SDK_PreThink);
 
-	g_inser_menu[client] = false;
-	g_dmdamage[client] = false;
+	m_dmdamage[client] = false;
 	CreateTimer(0.5, Spawn_NewPlayeR, client);
 }
 
@@ -346,7 +350,7 @@ public Action:Command_ChangeTeam(client, const String:command[], args)
 
 public Action:Command_Kill(client, const String:command[], args)
 {
-	if (!client || !IsClientConnected(client) || !g_block_kill) return Plugin_Continue;
+	if (!client || !IsClientConnected(client) || !g_blockKill) return Plugin_Continue;
 
 	return Plugin_Handled;
 }
@@ -371,9 +375,9 @@ public Action:Event_Round_Start(Handle:event, const String:name[], bool:dontBroa
 {
 	dm_game = true;
 
-	if (g_dm_mod == 1 && g_spawnCount == 0)
+	if (g_dmMode == MODE_DM && g_spawnCount == 0)
 	{
-		g_dm_mod = 0;
+		g_dmMode = MODE_TDM;
 		SendMsg(-1, 2, "%t", "Have not Spawn Origin In DM");
 		SendMsg(-1, 2, "%t", "Have not Spawn Origin In DM");
 		SendMsg(-1, 2, "%t", "Have not Spawn Origin In DM");
@@ -390,13 +394,13 @@ public Action:Event_Round_Start(Handle:event, const String:name[], bool:dontBroa
 		ingame_player++;
 	}
 
-	if (g_MaxKill == 0)
+	if (g_maxKill == 0)
 	{
-		if (g_dm_mod == 1) g_MaxKill = ingame_player * 2;
-		else g_MaxKill = ingame_player * 4;
+		if (g_dmMode == MODE_DM) g_maxKill = ingame_player * 2;
+		else g_maxKill = ingame_player * 4;
 	}
 
-	SendMsg(-1, 1, " Max Kill is : %d", g_MaxKill);
+	SendMsg(-1, 1, " Max Kill is : %d", g_maxKill);
 }
 
 public Action:CS_OnTerminateRound(&Float:delay, &CSRoundEndReason:reason)
@@ -409,15 +413,12 @@ public Action:CS_OnTerminateRound(&Float:delay, &CSRoundEndReason:reason)
 // Spawn New player ==========
 public Action:Spawn_NewPlayeR(Handle:timer, any:client )
 {
-	if (!IsClientConnected(client)) return;
+	if (!IsClientConnected(client))
+		return;
 
 	if (GetClientTeam(client) == CS_TEAM_T || GetClientTeam(client) == CS_TEAM_CT)
 	{
-		if (!g_inser_menu[client])
-		{
-			g_inser_menu[client] = true;
-			CreateTimer(g_spawn_time, Respawn, client);
-		}
+		CreateTimer(g_spawnTime, PlayerSpawn, client);
 		return;
 	}
 
@@ -433,29 +434,29 @@ public Action:Event_PlayerDeath(Handle:event, const String:name[], bool:dontBroa
 
 	new client = GetClientOfUserId(GetEventInt(event, "userid"));
 	new attacker = GetClientOfUserId(GetEventInt(event, "attacker"));
-	CreateTimer(g_spawn_time, Respawn, client);
+	CreateTimer(g_spawnTime, PlayerSpawn, client);
 
-	if (g_dm_mod == 1)
+	if (g_dmMode == MODE_DM)
 	{
-		g_player_kill[attacker]++;
-		SendMsg(attacker, 1, "%t", "DM_KILLNUM", g_player_kill[attacker], g_MaxKill);
+		m_playerKill[attacker]++;
+		SendMsg(attacker, 1, "%t", "DM_KILLNUM", m_playerKill[attacker], g_maxKill);
 	}
 	else
 	{
-		if (GetClientTeam(attacker) == CS_TEAM_T) TR_kill++;
-		else if (GetClientTeam(attacker) == CS_TEAM_CT) CT_kill++;
+		if (GetClientTeam(attacker) == CS_TEAM_T) g_teamTRKill++;
+		else if (GetClientTeam(attacker) == CS_TEAM_CT) g_teamCTKill++;
 
-		SendMsg(-1, 1, "%t", "TDM_KILLNUM", CT_kill, TR_kill, g_MaxKill);
+		SendMsg(-1, 1, "%t", "TDM_KILLNUM", g_teamCTKill, g_teamTRKill, g_maxKill);
 	}
 
-	if (g_player_kill[attacker] >= g_MaxKill || TR_kill >= g_MaxKill || CT_kill >= g_MaxKill)
-		dm_game_end( g_dm_mod, GetClientTeam(attacker), attacker, GetRandomInt(0, g_mapsCount-1));
+	if (m_playerKill[attacker] >= g_maxKill || g_teamTRKill >= g_maxKill || g_teamCTKill >= g_maxKill)
+		dm_game_end( GetClientTeam(attacker), attacker, GetRandomInt(0, g_mapsCount-1));
 }
 
 public Action:Event_PlayerSpawn(Handle:event, const String:name[], bool:dontBroadcast)
 {
 	new client = GetClientOfUserId(GetEventInt(event, "userid"));
-	if (g_dm_mod == 1 && g_spawnCount > 0) //CreateTimer(0.1, Set_Origin, client);
+	if (g_dmMode == MODE_DM && g_spawnCount > 0) //CreateTimer(0.1, Set_Origin, client);
 		Set_Origin(Handle:0.0, client);
 }
 
@@ -464,13 +465,13 @@ public Action:SDK_TakeDamage(victim, &attacker, &inflictor, &Float:damage, &dama
 	if (!dm_game)
 		return Plugin_Stop;
 
-	if (g_Protection[victim])
+	if (m_godMode[victim])
 	{
 		damage *= 0.0;
 		return Plugin_Changed;
 	}
 
-	if (g_dm_mod == 1 && attacker)
+	if (g_dmMode == MODE_DM && attacker)
 	{
 		new Vteam = GetClientTeam(victim);
 
@@ -481,7 +482,7 @@ public Action:SDK_TakeDamage(victim, &attacker, &inflictor, &Float:damage, &dama
 			if (Vteam == CS_TEAM_T) SetEntProp(victim,Prop_Data,"m_iTeamNum", CS_TEAM_CT,2);
 			else  SetEntProp(victim,Prop_Data,"m_iTeamNum", CS_TEAM_T,2);
 
-			g_dmdamage[victim] = true;
+			m_dmdamage[victim] = true;
 		}
 	}
 
@@ -490,13 +491,13 @@ public Action:SDK_TakeDamage(victim, &attacker, &inflictor, &Float:damage, &dama
 
 public SDK_TakeDamagePost(victim, attacker, inflictor, Float:damage, damagetype)
 {
-	if (!g_dmdamage[victim])
+	if (!m_dmdamage[victim])
 		return;
 
 	if (GetClientTeam(victim) == CS_TEAM_T) SetEntProp(victim,Prop_Data,"m_iTeamNum", CS_TEAM_CT,2);
 	else SetEntProp(victim,Prop_Data,"m_iTeamNum", CS_TEAM_T,2);
 
-	g_dmdamage[victim] = false;
+	m_dmdamage[victim] = false;
 }
 
 public SDK_PreThink(client)
@@ -506,20 +507,20 @@ public SDK_PreThink(client)
 
 	SetEntData(client, g_iAccount, 0);
 
-	if (g_unlimitbp_ammo) Set_BpAmmo(client);
+	if (g_ammoUnlimitbp) Set_BpAmmo(client);
 }
 
 public Action:CS_OnCSWeaponDrop(client, weaponIndex) 
-	if (g_redropp_weapon) AcceptEntityInput(weaponIndex, "Kill"); 
+	if (g_removeDropWeapon) AcceptEntityInput(weaponIndex, "Kill"); 
 // ===============================
 
 // Dm Spawn ====================
-public Action:Respawn(Handle:timer, any:client )
+public Action:PlayerSpawn(Handle:timer, any:client )
 	Get_Weapon_Menu(client);
 
 public Get_Weapon_Menu(client)
 {
-	if ((g_sec_weaponid[client] == 0 && g_pri_weaponid[client] == 0) || get_user_bot(client))
+	if ((m_secWeaponID[client] == 0 && m_priWeaponID[client] == 0) || get_user_bot(client))
 	{
 		Send_Pri_Weapon_Menu(client);
 		return;
@@ -544,10 +545,10 @@ public Get_Weapon_Menu(client)
 	Format(menu_setting, 99, "%t :", "Your Last Time Weapon");
 	DrawPanelItem(weaponmenu, menu_setting, ITEMDRAW_DISABLED);
 
-	Format(Weapon_Name, sizeof(Weapon_Name), "%s", WEAPON_CLASSNAME[g_sec_weaponid[client]]);
+	Format(Weapon_Name, sizeof(Weapon_Name), "%s", WEAPON_CLASSNAME[m_secWeaponID[client]]);
 	DrawPanelItem(weaponmenu, Weapon_Name, ITEMDRAW_DISABLED);
 
-	Format(Weapon_Name, sizeof(Weapon_Name), "%s", WEAPON_CLASSNAME[g_pri_weaponid[client]]);
+	Format(Weapon_Name, sizeof(Weapon_Name), "%s", WEAPON_CLASSNAME[m_priWeaponID[client]]);
 	DrawPanelItem(weaponmenu, Weapon_Name, ITEMDRAW_DISABLED);
 
 	SendPanelToClient(weaponmenu, client, Weapon_Menu, 500);
@@ -564,7 +565,7 @@ public Send_Pri_Weapon_Menu(client)
 {
 	if (get_user_bot(client)) 
 	{
-		g_pri_weaponid[client] = g_priweaponID[GetRandomInt(0, g_priweapon-1)];
+		m_priWeaponID[client] = g_priweaponID[GetRandomInt(0, g_priweapon-1)];
 		Send_Sec_Weapon_Menu(client);
 		return;
 	}
@@ -577,7 +578,7 @@ public Send_Pri_Weapon_Menu(client)
 	new i, String:Value[64];
 	for (i = 0; i < g_priweapon; i++)
 	{
-		Format(Value, sizeof(Value), "%s", g_priweaponN[i]);
+		Format(Value, sizeof(Value), "%s", g_priweaponName[i]);
 		DrawPanelItem(weaponmenu, Value, ITEMDRAW_DEFAULT);
 	}
 
@@ -588,7 +589,7 @@ public Send_Pri_Weapon_Menu(client)
 public PriWeapon_Menu(Handle:menu, MenuAction:action, param1, param2)
 {
 	param2--;
-	g_pri_weaponid[param1] = g_priweaponID[param2];
+	m_priWeaponID[param1] = g_priweaponID[param2];
 	Send_Sec_Weapon_Menu(param1);
 }
 
@@ -596,7 +597,7 @@ public Send_Sec_Weapon_Menu(client)
 {
 	if (get_user_bot(client)) 
 	{
-		g_sec_weaponid[client] = g_secweaponID[GetRandomInt(0, g_secweapon-1)];
+		m_secWeaponID[client] = g_secweaponID[GetRandomInt(0, g_secweapon-1)];
 		Player_Spawn(client);
 		return;
 	}
@@ -609,7 +610,7 @@ public Send_Sec_Weapon_Menu(client)
 	new i, String:Value[64];
 	for (i = 0; i < g_secweapon; i++)
 	{
-		Format(Value, sizeof(Value), "%s", g_secweaponN[i]);
+		Format(Value, sizeof(Value), "%s", g_secweaponName[i]);
 		DrawPanelItem(weaponmenu, Value, ITEMDRAW_DEFAULT);
 	}
 
@@ -620,7 +621,7 @@ public Send_Sec_Weapon_Menu(client)
 public SecWeapon_Menu(Handle:menu, MenuAction:action, param1, param2)
 {
 	param2--;
-	g_sec_weaponid[param1] = g_secweaponID[param2];
+	m_secWeaponID[param1] = g_secweaponID[param2];
 
 	Player_Spawn(param1);
 }
@@ -636,7 +637,7 @@ public Player_Spawn(client)
 
 	GivePlayerItem(client, "item_assaultsuit", 0);
 
-	g_Protection[client] = 1;
+	m_godMode[client] = true;
 	SetEntityRenderMode(client, RENDER_TRANSADD);
 	SetEntityRenderFx(client, RENDERFX_DISTORT);
 
@@ -645,32 +646,30 @@ public Player_Spawn(client)
 	else if (GetClientTeam(client) == CS_TEAM_CT)
 		SetEntityRenderColor(client, 0, 0, 200, 120);
 
-	GivePlayerItem(client, WEAPON_CLASSNAME[g_sec_weaponid[client]]);
-	GivePlayerItem(client, WEAPON_CLASSNAME[g_pri_weaponid[client]]);
+	GivePlayerItem(client, WEAPON_CLASSNAME[m_secWeaponID[client]]);
+	GivePlayerItem(client, WEAPON_CLASSNAME[m_priWeaponID[client]]);
 
-	if (g_spawn_grenade[0]) GivePlayerItem(client, "weapon_hegrenade");
-	if (g_spawn_grenade[1]) GivePlayerItem(client, "weapon_flashbang");
-	if (g_spawn_grenade[2]) GivePlayerItem(client, "weapon_smokegrenade");
+	if (g_spawnGetGrenade[0]) GivePlayerItem(client, "weapon_hegrenade");
+	if (g_spawnGetGrenade[1]) GivePlayerItem(client, "weapon_flashbang");
+	if (g_spawnGetGrenade[2]) GivePlayerItem(client, "weapon_smokegrenade");
 
-	CreateTimer(g_protect_time, RemoveProtection, client);
+	CreateTimer(g_spawnGodTime, RemoveProtection, client);
 }
 // ===============================
 
 // Dm game end ====================
-public dm_game_end(gamemod, winteam, winplayer, next_map)
+public dm_game_end(winteam, winplayer, next_map)
 {	
 	dm_game = false;
 	CreateTimer(8.0, change_map, next_map);
-	if (gamemod == 1)
-	{
-		SendMsg(-1, 1, "%t", "DM_WIN", winplayer, g_mapname[next_map]);
-		return;
-	}
-	SendMsg(-1, 1, "%t", "TDM_WILL",  winteam, g_mapname[next_map]);
+	if (g_dmMode == MODE_DM)
+		SendMsg(-1, 1, "%t", "DM_WIN", winplayer, g_mapsName[next_map]);
+	else
+		SendMsg(-1, 1, "%t", "TDM_WILL", winteam, g_mapsName[next_map]);
 }
 
 public Action: change_map(Handle:timer, any:next_map )
-	ServerCommand("changelevel %s", g_mapname[next_map]);
+	ServerCommand("changelevel %s", g_mapsName[next_map]);
 // ===============================
 
 public Action:Set_Origin(Handle:timer, any:client)
@@ -723,7 +722,7 @@ public Action:RemoveProtection(Handle:timer, any:client )
 	SetEntityRenderMode(client, RENDER_NORMAL);
 	SetEntityRenderFx(client, RENDERFX_NONE);
 	SetEntityRenderColor(client);	
-	g_Protection[client] = 0;
+	m_godMode[client] = false;
 }
 
 public Set_BpAmmo(client) // Set Bp ammo, i order in amxx plug-in..
