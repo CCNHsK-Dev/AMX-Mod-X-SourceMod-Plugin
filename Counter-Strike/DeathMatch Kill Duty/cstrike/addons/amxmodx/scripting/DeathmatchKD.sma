@@ -15,7 +15,7 @@
 #include <hamsandwich>
 
 #define PLUGIN	"Deathmatch: Kill Duty"
-#define VERSION	"3.0.9.27"
+#define VERSION	"3.1.0.0"
 #define AUTHOR	"HsK-Dev Blog By CCN"
 
 new const MAX_BPAMMO[] = { -1, 52, -1, 90, 1, 32, 1, 100, 90, 1, 120, 100, 100, 90, 90, 90, 100, 120,
@@ -227,7 +227,7 @@ LoadDMKDSetting ()
 	g_BZAddHp = true;
 	g_BZAddHpTime = 5.0;
 	g_BZAddHpAmounT = 10;
-	g_dmModeKillerAddHP = 10;
+	g_dmModeKillerAddHP = 20;
 	g_deadSeePlayerTime = 4.0;
 	
 	LoadDMSettingFile();
@@ -1096,10 +1096,22 @@ public dm_menu_pri_weap(id)
 
 	if (dm_user_tbot(id))
 	{
-		new random, weaponid;
+		new random, weaponid = -1;
 		random = random_num(0, 5);
 		if (random < 3 && g_bnweapon[0][random] != -1)
-			weaponid = g_priweaponID[g_bnweapon[0][random]];
+		{
+			if (random == 2 && g_dmMode == MODE_DM)
+			{
+				random = random_num(0, 3);
+				if (random == 3)
+					weaponid = g_priweaponID[random_num(0, g_priweapon-1)];
+				else if (g_bnweapon[0][random] == -1)
+					random = 2;
+			}
+		
+			if (weaponid == -1)
+				weaponid = g_priweaponID[g_bnweapon[0][random]];
+		}
 		else
 			weaponid = g_priweaponID[random_num(0, g_priweapon-1)];
 		

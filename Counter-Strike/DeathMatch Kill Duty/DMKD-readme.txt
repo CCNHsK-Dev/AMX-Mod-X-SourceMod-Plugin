@@ -1,19 +1,40 @@
 
-DeathMatch:Kill Duty (DM:KD)
+DeathMatch: Kill Duty
 HsK-Dev Blog By CCN
 
 DeathMatch Plug-in for Counter-Strike
 
 Need:
- - AMX Mod X
  - Counter-Strike 1.6
+ - AMX Mod X
 
 _____________________________
+DeathMatch: Kill Duty - Upgrade 2
+Version: 3.1.0 (22/3/2017)
+ - Hud Message improve
+ - Add Kill Hud Message
+ - Aim Message fixed
+ - Game Menu improve
+ - Add Round Time
+ - Bot Choose Weapon improve
+ - Now Can Save M4A1/USP Silenced
+ - Max Kill Auto Setting improve
+ - Freezetime and Round Start Time fixed
+ - DM Mode Spawn Point improve
+ - Death Player Action improve
+ - Death Entity Action improve
+ - BuyZone Add HP Fixed
+ - New Player Connect improve
+ - More Base improve and fixed
+
+_____________________________
+DeathMatch: Kill Duty - Upgrade 1
 Version: 3.0.1 (11/10/2015)
  - Add Kill Msg
  - Fixed BUGS
 
 _____________________________
+DeathMatch: Kill Duty
 Version: 3.0.0 (1/4/2012)
  - Available
  
