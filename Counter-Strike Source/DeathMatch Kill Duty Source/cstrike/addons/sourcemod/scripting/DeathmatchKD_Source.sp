@@ -18,7 +18,7 @@ public Plugin:myinfo =
 	name = "DeathMatch: Kill Duty Source",
 	author = "HsK-Dev Blog By CCN",
 	description = "Deathmatch: Kill Duty Source",
-	version = "2.0.0.2",
+	version = "2.0.0.3",
 	url = "http://ccnhsk-dev.blogspot.com/"
 };
 
@@ -40,7 +40,8 @@ new const g_BpAmmo[] = { -1, 52, 120, 100, 1, 32, 1, 100, 90, 1, 120, -1, 100, 9
 
 // Game vars
 new g_dmMode = -1; // DM MoD
-new bool:dm_game = false; // DM Game
+new bool:g_dmGameStart = false;
+new bool:g_dmGameEnd = false;
 new g_maxKill = 0; // Max Kill
 new g_teamCTKill, g_teamTRKill; // CT and TR Kill [tdm]
 
@@ -89,7 +90,8 @@ public OnPluginStart()
 public OnConfigsExecuted()
 {
 	g_dmMode = -1;
-	dm_game = false;
+	g_dmGameStart = false;
+	g_dmGameEnd = false;
 	for (new i = 0; i < 128; i++)
 		g_spawns[i][0] = 0.0, g_spawns[i][1] = 0.0, g_spawns[i][2] = 0.0;
 	g_spawnCount = 0;
@@ -373,7 +375,8 @@ public SDK_SpawnPost(entity)
 // Cs Round Set ===========
 public Action:Event_Round_Start(Handle:event, const String:name[], bool:dontBroadcast)
 {
-	dm_game = true;
+	g_dmGameStart = true;
+	g_dmGameEnd = false;
 
 	if (g_dmMode == MODE_DM && g_spawnCount == 0)
 	{
@@ -405,7 +408,7 @@ public Action:Event_Round_Start(Handle:event, const String:name[], bool:dontBroa
 
 public Action:CS_OnTerminateRound(&Float:delay, &CSRoundEndReason:reason)
 {
-	if (!dm_game) return Plugin_Continue;
+	if (!dm_GameRun ()) return Plugin_Continue;
 	return Plugin_Handled;
 }
 // ===================
@@ -429,7 +432,7 @@ public Action:Spawn_NewPlayeR(Handle:timer, any:client )
 // Dm playing ==================
 public Action:Event_PlayerDeath(Handle:event, const String:name[], bool:dontBroadcast)
 {
-	if (!dm_game)
+	if (!dm_GameRun ())
 		return;
 
 	new client = GetClientOfUserId(GetEventInt(event, "userid"));
@@ -462,7 +465,7 @@ public Action:Event_PlayerSpawn(Handle:event, const String:name[], bool:dontBroa
 
 public Action:SDK_TakeDamage(victim, &attacker, &inflictor, &Float:damage, &damagetype)
 {
-	if (!dm_game)
+	if (!dm_GameRun ())
 		return Plugin_Stop;
 
 	if (m_godMode[victim])
@@ -660,7 +663,7 @@ public Player_Spawn(client)
 // Dm game end ====================
 public dm_game_end(winteam, winplayer, next_map)
 {	
-	dm_game = false;
+	g_dmGameEnd = true;
 	CreateTimer(8.0, change_map, next_map);
 	if (g_dmMode == MODE_DM)
 		SendMsg(-1, 1, "%t", "DM_WIN", winplayer, g_mapsName[next_map]);
@@ -671,6 +674,11 @@ public dm_game_end(winteam, winplayer, next_map)
 public Action: change_map(Handle:timer, any:next_map )
 	ServerCommand("changelevel %s", g_mapsName[next_map]);
 // ===============================
+
+public bool:dm_GameRun ()
+{
+	return (g_dmGameStart && !g_dmGameEnd);
+}
 
 public Action:Set_Origin(Handle:timer, any:client)
 //public Set_Origin(client)
@@ -708,10 +716,10 @@ public bool:TraceEntityFilterPlayer(entity, mask, any:data)
 	if (entity != 0)// && IsClientConnected(entity))
 		return true;
 
-        if(entity == data)
-                return false;
-
-        return true;
+	if(entity == data)
+		return false;
+		
+	return true;
 }
 
 public Action:RemoveProtection(Handle:timer, any:client )
