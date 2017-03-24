@@ -18,7 +18,7 @@ public Plugin:myinfo =
 	name = "DeathMatch: Kill Duty Source",
 	author = "HsK-Dev Blog By CCN",
 	description = "Deathmatch: Kill Duty Source",
-	version = "2.0.0.5",
+	version = "2.0.0.6",
 	url = "http://ccnhsk-dev.blogspot.com/"
 };
 
@@ -322,24 +322,21 @@ public Action:Command_DmSet(client, args)
 
 public Dm_Game_Set_Menu(client)
 {
-	new Handle:dmsetmenu = CreatePanel();
-	SetPanelTitle(dmsetmenu, "DM:KD-S Setting Menu");
+	delete m_menu[client];
+	m_menu[client] = null;
+	m_menuType[client] = 10;
+	
+	new String:Value[64];
+	m_menu[client] = new Menu(Handler_Menu, MENU_ACTIONS_ALL);
+	
+	Format(Value, sizeof(Value), "DM:KD-S Setting Menu");
+	m_menu[client].SetTitle("%s?", Value);
+	
+	Format(Value, sizeof(Value), "Set new spawn origin");
+	m_menu[client].AddItem(Value, Value);
 
-	DrawPanelItem(dmsetmenu, "Set new spawn origin", ITEMDRAW_DEFAULT);
-
-	DrawPanelItem(dmsetmenu, "Exit", ITEMDRAW_CONTROL);
-
-	SendPanelToClient(dmsetmenu, client, Dm_Game_Set, 20);
-	CloseHandle(dmsetmenu);
-}
-
-public Dm_Game_Set(Handle:menu, MenuAction:action, param1, param2)
-{
-	if (param2 == 1)
-	{
-		Dm_Game_Set_Menu(param1);
-		save_ranspawn(param1);
-	}
+	m_menu[client].ExitButton = true;
+	m_menu[client].Display (client, 9999);
 }
 // ========================
 
@@ -679,6 +676,12 @@ public int Handler_Menu(Menu:menu, MenuAction:action, param1, param2)
 		{
 			m_secWeaponID[param1] = param2;
 			Player_Spawn(param1);
+		}
+		
+		else if (m_menuType[param1] == 10)
+		{
+			Dm_Game_Set_Menu(param1);
+			save_ranspawn(param1);
 		}
 	}
 
