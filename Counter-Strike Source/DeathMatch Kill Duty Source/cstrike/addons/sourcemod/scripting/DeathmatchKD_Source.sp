@@ -18,7 +18,7 @@ public Plugin:myinfo =
 	name = "DeathMatch: Kill Duty Source",
 	author = "HsK-Dev Blog By CCN",
 	description = "Deathmatch: Kill Duty Source",
-	version = "2.0.0.4",
+	version = "2.0.0.5",
 	url = "http://ccnhsk-dev.blogspot.com/"
 };
 
@@ -62,6 +62,8 @@ new g_priweaponID[30], g_secweaponID[30];
 new String:g_priweaponName[30][512], String:g_secweaponName[30][512];
 
 // Player vars
+Menu m_menu[MAXPLAYERS + 1];
+new m_menuType[MAXPLAYERS + 1];
 new m_priWeaponID[MAXPLAYERS + 1],  m_secWeaponID[MAXPLAYERS + 1]; // Is Weap set
 new bool:m_godMode[MAXPLAYERS + 1], Float:m_godModeTime[MAXPLAYERS + 1]; // Is Protect 
 new Float:m_spawnTime[MAXPLAYERS + 1]; // Player Spawn Time
@@ -381,6 +383,9 @@ public Action:Event_Round_Start(Handle:event, const String:name[], bool:dontBroa
 	g_dmGameStart = true;
 	g_dmGameEnd = false;
 
+	if (g_dmMode != MODE_DM)
+		g_dmMode = MODE_TDM;
+	
 	if (g_dmMode == MODE_DM && g_spawnCount == 0)
 	{
 		g_dmMode = MODE_TDM;
@@ -568,105 +573,116 @@ public Get_Weapon_Menu(client)
 		Send_Pri_Weapon_Menu(client);
 		return;
 	}
+	
+	delete m_menu[client];
+	m_menu[client] = null;
+	m_menuType[client] = 1;
+	new String:Value[64];
+	m_menu[client] = new Menu(Handler_Menu, MENU_ACTIONS_ALL);
+	
+	Format(Value, sizeof(Value), "%t", "Weapon Menu");
+	m_menu[client].SetTitle("%s?", Value);
 
-	new Handle:weaponmenu = CreatePanel();
-
-	decl String:menu_setting[100];
-	Format(menu_setting, 99, "%t", "Weapon Menu");
-
-	SetPanelTitle(weaponmenu, menu_setting);
-
-	Format(menu_setting, 99, "%t", "Use New Weapon");
-	DrawPanelItem(weaponmenu, menu_setting, ITEMDRAW_DEFAULT);
-
-	Format(menu_setting, 99, "%t", "Use Last-Time Weapon");
-	DrawPanelItem(weaponmenu, menu_setting, ITEMDRAW_DEFAULT);
-
-	new String:Weapon_Name[64];
-	SetPanelCurrentKey(weaponmenu, 7);
-
-	Format(menu_setting, 99, "%t :", "Your Last Time Weapon");
-	DrawPanelItem(weaponmenu, menu_setting, ITEMDRAW_DISABLED);
-
-	Format(Weapon_Name, sizeof(Weapon_Name), "%s", WEAPON_CLASSNAME[m_secWeaponID[client]]);
-	DrawPanelItem(weaponmenu, Weapon_Name, ITEMDRAW_DISABLED);
-
-	Format(Weapon_Name, sizeof(Weapon_Name), "%s", WEAPON_CLASSNAME[m_priWeaponID[client]]);
-	DrawPanelItem(weaponmenu, Weapon_Name, ITEMDRAW_DISABLED);
-
-	SendPanelToClient(weaponmenu, client, Weapon_Menu, 500);
-	CloseHandle(weaponmenu);
-}
-
-public Weapon_Menu(Handle:menu, MenuAction:action, param1, param2)
-{
-	if (param2 == 1) Send_Pri_Weapon_Menu(param1);
-	else Player_Spawn(param1);
+	Format(Value, sizeof(Value), "%t", "Use New Weapon");
+	m_menu[client].AddItem(Value, Value);
+	
+	Format(Value, sizeof(Value), "%t", "Use Last-Time Weapon");
+	m_menu[client].AddItem(Value, Value);
+	
+	Format(Value, sizeof(Value), "%t :", "Your Last Time Weapon");
+	m_menu[client].AddItem(Value, Value);
+	
+	Format(Value, sizeof(Value), "%s", g_priweaponName[m_priWeaponID[client]]);
+	m_menu[client].AddItem(Value, Value);
+	
+	Format(Value, sizeof(Value), "%s", g_secweaponName[m_secWeaponID[client]]);
+	m_menu[client].AddItem(Value, Value);
+		
+	m_menu[client].ExitButton = false;
+	m_menu[client].Display (client, 9999);
 }
 
 public Send_Pri_Weapon_Menu(client)
 {
 	if (get_user_bot(client)) 
 	{
-		m_priWeaponID[client] = g_priweaponID[GetRandomInt(0, g_priweaponNum-1)];
+		m_priWeaponID[client] = GetRandomInt(0, g_priweaponNum-1);
 		Send_Sec_Weapon_Menu(client);
 		return;
 	}
 
-	decl String:title[100];
-	Format(title, 64, "%t", "Pri Weapon Menu");
-	new Handle:weaponmenu = CreatePanel();
-	SetPanelTitle(weaponmenu, title);
-
-	new i, String:Value[64];
-	for (i = 0; i < g_priweaponNum; i++)
+	delete m_menu[client];
+	m_menu[client] = null;
+	m_menuType[client] = 2;
+	new String:Value[64];
+	m_menu[client] = new Menu(Handler_Menu, MENU_ACTIONS_ALL);
+	
+	Format(Value, sizeof(Value), "%t", "Pri Weapon Menu");
+	m_menu[client].SetTitle("%s?", Value);
+	
+	for (new i = 0; i < g_priweaponNum; i++)
 	{
 		Format(Value, sizeof(Value), "%s", g_priweaponName[i]);
-		DrawPanelItem(weaponmenu, Value, ITEMDRAW_DEFAULT);
-	}
-
-	SendPanelToClient(weaponmenu, client, PriWeapon_Menu, 500);
-	CloseHandle(weaponmenu);
-}
-
-public PriWeapon_Menu(Handle:menu, MenuAction:action, param1, param2)
-{
-	param2--;
-	m_priWeaponID[param1] = g_priweaponID[param2];
-	Send_Sec_Weapon_Menu(param1);
+		m_menu[client].AddItem(Value, Value);
+	}	
+	
+	m_menu[client].ExitButton = false;
+	m_menu[client].Display (client, 9999);
 }
 
 public Send_Sec_Weapon_Menu(client)
 {
 	if (get_user_bot(client)) 
 	{
-		m_secWeaponID[client] = g_secweaponID[GetRandomInt(0, g_secweaponNum-1)];
+		m_secWeaponID[client] = GetRandomInt(0, g_secweaponNum-1);
 		Player_Spawn(client);
 		return;
 	}
 
-	decl String:title[100];
-	Format(title, 64, "%t", "Sec Weapon Menu");
-	new Handle:weaponmenu = CreatePanel();
-	SetPanelTitle(weaponmenu, title);
-
-	new i, String:Value[64];
-	for (i = 0; i < g_secweaponNum; i++)
+	delete m_menu[client];
+	m_menu[client] = null;
+	m_menuType[client] = 3;
+	new String:Value[64];
+	m_menu[client] = new Menu(Handler_Menu, MENU_ACTIONS_ALL);
+	
+	Format(Value, sizeof(Value), "%t", "Sec Weapon Menu");
+	m_menu[client].SetTitle("%s?", Value);
+	
+	for (new i = 0; i < g_secweaponNum; i++)
 	{
 		Format(Value, sizeof(Value), "%s", g_secweaponName[i]);
-		DrawPanelItem(weaponmenu, Value, ITEMDRAW_DEFAULT);
-	}
-
-	SendPanelToClient(weaponmenu, client, SecWeapon_Menu, 500);
-	CloseHandle(weaponmenu);
+		m_menu[client].AddItem(Value, Value);
+	}	
+	
+	m_menu[client].ExitButton = false;
+	m_menu[client].Display (client, 9999);
 }
 
-public SecWeapon_Menu(Handle:menu, MenuAction:action, param1, param2)
+public int Handler_Menu(Menu:menu, MenuAction:action, param1, param2)
 {
-	param2--;
-	m_secWeaponID[param1] = g_secweaponID[param2];
+	if (action == MenuAction_Select)
+	{
+		if (m_menuType[param1] == 1)
+		{
+			param2++;
+			if (param2 == 1)
+				Send_Pri_Weapon_Menu(param1);
+			else
+				Player_Spawn(param1);
+		}
+		else if (m_menuType[param1] == 2)
+		{
+			m_priWeaponID[param1] = param2;
+			Send_Sec_Weapon_Menu(param1);
+		}
+		else if (m_menuType[param1] == 3)
+		{
+			m_secWeaponID[param1] = param2;
+			Player_Spawn(param1);
+		}
+	}
 
-	Player_Spawn(param1);
+	return 0;
 }
 
 public Player_Spawn(client)
@@ -682,8 +698,8 @@ public Player_Spawn(client)
 
 	m_godModeTime[client] = GetGameTime () + g_spawnGodTime;
 
-	GivePlayerItem(client, WEAPON_CLASSNAME[m_secWeaponID[client]]);
-	GivePlayerItem(client, WEAPON_CLASSNAME[m_priWeaponID[client]]);
+	GivePlayerItem(client, WEAPON_CLASSNAME[g_secweaponID[m_secWeaponID[client]]]);
+	GivePlayerItem(client, WEAPON_CLASSNAME[g_priweaponID[m_priWeaponID[client]]]);
 
 	if (g_spawnGetGrenade[0]) GivePlayerItem(client, "weapon_hegrenade");
 	if (g_spawnGetGrenade[1]) GivePlayerItem(client, "weapon_flashbang");
@@ -708,6 +724,9 @@ public Action: change_map(Handle:timer, any:next_map )
 
 public PlayerDataReset(id)
 {
+	m_menu[id] = null;
+	m_menuType[id] = 0;
+
 	m_priWeaponID[id] = 0;
 	m_secWeaponID[id] = 0;
 	m_godModeTime[id] = -1.0;
