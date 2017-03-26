@@ -1,7 +1,7 @@
 
 /* 
 			DeathMatch: Kill Duty Source - Upgrade 1
-				xx/3/2017 (Version: 2.0)
+				xx/4/2017 (Version: 2.0)
 			
 					HsK-Dev Blog By CCN
 			
@@ -18,7 +18,7 @@ public Plugin:myinfo =
 	name = "DeathMatch: Kill Duty Source",
 	author = "HsK-Dev Blog By CCN",
 	description = "Deathmatch: Kill Duty Source",
-	version = "2.0.0.6",
+	version = "2.0.0.8",
 	url = "http://ccnhsk-dev.blogspot.com/"
 };
 
@@ -343,7 +343,8 @@ public Dm_Game_Set_Menu(client)
 // Block Command ======
 public Action:Command_ChangeTeam(client, const String:command[], args)
 {
-	if (!client || !IsClientConnected(client) || !IsClientInGame(client)) return Plugin_Continue;
+	if (!client || !IsClientConnected(client) || !IsClientInGame(client))
+		return Plugin_Continue;
 
 	if (GetClientTeam(client) == CS_TEAM_T || GetClientTeam(client) == CS_TEAM_CT)
 		return Plugin_Stop;
@@ -353,24 +354,12 @@ public Action:Command_ChangeTeam(client, const String:command[], args)
 
 public Action:Command_Kill(client, const String:command[], args)
 {
-	if (!client || !IsClientConnected(client) || !g_blockKill) return Plugin_Continue;
+	if (!client || !IsClientConnected(client) || !g_blockKill)
+		return Plugin_Continue;
 
 	return Plugin_Handled;
 }
 // =======================
-
-
-// Remove Entity =========
-public SDK_SpawnPost(entity)
-{
-	if(!IsValidEntity(entity)) return;
-	decl String:ent_name[64];
-	GetEdictClassname(entity, ent_name, sizeof(ent_name));
-
-	for (new j = 0; j  < sizeof OBJECTIVE_ENTITYS; j++)
-		if(!strcmp(ent_name, OBJECTIVE_ENTITYS[j], false))  RemoveEdict(entity);
-}
-// ====================
 
 // Cs Round Set ===========
 public Action:Event_Round_Start(Handle:event, const String:name[], bool:dontBroadcast)
@@ -413,7 +402,9 @@ public Action:Event_Round_Start(Handle:event, const String:name[], bool:dontBroa
 
 public Action:CS_OnTerminateRound(&Float:delay, &CSRoundEndReason:reason)
 {
-	if (!dm_GameRun ()) return Plugin_Continue;
+	if (!dm_GameRun ())
+		return Plugin_Continue;
+	
 	return Plugin_Handled;
 }
 // ===================
@@ -447,7 +438,7 @@ public Action:Event_PlayerDeath(Handle:event, const String:name[], bool:dontBroa
 public Action:Event_PlayerSpawn(Handle:event, const String:name[], bool:dontBroadcast)
 {
 	new client = GetClientOfUserId(GetEventInt(event, "userid"));
-	if (g_dmMode == MODE_DM && g_spawnCount > 0) //CreateTimer(0.1, Set_Origin, client);
+	if (g_dmMode == MODE_DM && g_spawnCount > 0)
 		Set_Origin(Handle:0.0, client);
 }
 
@@ -552,9 +543,6 @@ public SDK_PreThink(client)
 		}
 	}
 }
-
-public Action:CS_OnCSWeaponDrop(client, weaponIndex) 
-	if (g_removeDropWeapon) AcceptEntityInput(weaponIndex, "Kill"); 
 // ===============================
 
 // Dm Spawn ====================
@@ -690,12 +678,18 @@ public int Handler_Menu(Menu:menu, MenuAction:action, param1, param2)
 
 public Player_Spawn(client)
 {
-	if (!IsPlayerAlive(client)) CS_RespawnPlayer(client);
-
-	new weaponEntity = GetPlayerWeaponSlot(client, 1);
-
-	RemovePlayerItem(client, weaponEntity);
-	RemoveEdict(weaponEntity);
+	if (!IsPlayerAlive(client))
+		CS_RespawnPlayer(client);
+		
+	for (new i = 0; i < 2; i++)
+	{
+		new weaponEntity = GetPlayerWeaponSlot(client, i);
+		if (weaponEntity == -1)
+			continue;
+			
+		RemovePlayerItem(client, weaponEntity);
+		RemoveEdict(weaponEntity);
+	}
 
 	GivePlayerItem(client, "item_assaultsuit", 0);
 
@@ -718,12 +712,65 @@ public dm_game_end(winteam, winplayer, next_map)
 	if (g_dmMode == MODE_DM)
 		SendMsg(-1, 1, "%t", "DM_WIN", winplayer, g_mapsName[next_map]);
 	else
-		SendMsg(-1, 1, "%t", "TDM_WILL", winteam, g_mapsName[next_map]);
+		SendMsg(-1, 1, "%t", "TDM_WIN", winteam, g_mapsName[next_map]);
 }
 
 public Action: change_map(Handle:timer, any:next_map )
 	ServerCommand("changelevel %s", g_mapsName[next_map]);
 // ===============================
+
+// Remove Weapon ===============
+public Action:CS_OnCSWeaponDrop(client, weaponIndex) 
+{
+	if (!g_removeDropWeapon)
+		return;
+	
+	CreateTimer(0.1, RemoveWeaponCheck, weaponIndex);
+}
+
+
+public Action: RemoveWeaponCheck(Handle:timer, any:weaponIndex )
+{
+	Handle hData = CreateDataPack();
+	WritePackCell(hData, weaponIndex);
+	WritePackCell(hData, GetGameTime()+8.0);
+	CreateTimer(0.1, RemoveWeapon, hData);
+}
+
+public Action: RemoveWeapon(Handle hTimer, Handle hData)
+{
+	ResetPack(hData);
+	new weaponIndex = ReadPackCell(hData);
+	new Float:removeTime = ReadPackCell(hData);
+	
+	if (!IsValidEdict(weaponIndex) || !IsValidEntity(weaponIndex) || GetEntPropEnt(weaponIndex, Prop_Data, "m_hOwnerEntity") != -1)
+		return;
+	
+	if (GetGameTime() >= removeTime)
+	{
+		AcceptEntityInput(weaponIndex, "Kill"); 	
+		return;
+	}
+	
+	CreateTimer(0.1, RemoveWeapon, hData);
+}
+
+// ===============================
+
+// Remove Entity =========
+public SDK_SpawnPost(entity)
+{
+	if(!IsValidEntity(entity)) return;
+	decl String:ent_name[64];
+	GetEdictClassname(entity, ent_name, sizeof(ent_name));
+
+	for (new j = 0; j  < sizeof OBJECTIVE_ENTITYS; j++)
+	{
+		if(!strcmp(ent_name, OBJECTIVE_ENTITYS[j], false))
+			RemoveEdict(entity);
+	}
+}
+// ====================
 
 public PlayerDataReset(id)
 {
