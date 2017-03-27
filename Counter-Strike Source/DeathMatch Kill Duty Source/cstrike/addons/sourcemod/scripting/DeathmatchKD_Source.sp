@@ -18,7 +18,7 @@ public Plugin:myinfo =
 	name = "DeathMatch: Kill Duty Source",
 	author = "HsK-Dev Blog By CCN",
 	description = "Deathmatch: Kill Duty Source",
-	version = "2.0.0.10",
+	version = "2.0.0.11",
 	url = "http://ccnhsk-dev.blogspot.com/"
 };
 
@@ -82,6 +82,7 @@ public OnPluginStart()
 	RegConsoleCmd("say", Command_DmSet);
 
 	HookEvent("round_start", Event_Round_Start, EventHookMode_Post);
+	HookEvent("round_freeze_end",Event_RoundFreezeEnd);
 	
 	HookEvent("player_death", Event_PlayerDeath);
 	HookEvent("player_spawn", Event_PlayerSpawn);
@@ -122,6 +123,7 @@ public OnConfigsExecuted()
 	LoadRandomMapsFile();
 
 	ServerCommand("mp_timelimit 0");
+	ServerCommand("sv_hudhint_sound 0");
 }
 // ==================================
 
@@ -369,12 +371,15 @@ public Action:Command_Kill(client, const String:command[], args)
 public Action:Event_Round_Start(Handle:event, const String:name[], bool:dontBroadcast)
 {
 	GameDataReset();
-
-	g_dmGameStart = true;
-	g_dmGameEnd = false;
-
+	
 	if (g_dmMode != MODE_DM)
 		g_dmMode = MODE_TDM;
+}
+
+public Action:Event_RoundFreezeEnd(Handle:event, const String:name[], bool:dontBroadcast)
+{
+	g_dmGameStart = true;
+	g_dmGameEnd = false;
 	
 	if (g_dmMode == MODE_DM && g_spawnCount == 0)
 	{
@@ -395,6 +400,7 @@ public Action:Event_Round_Start(Handle:event, const String:name[], bool:dontBroa
 		if (!IsClientConnected(player) || !IsClientInGame(player)) continue;
 
 		ingame_player++;
+		PlayerSpawn(player);
 	}
 
 	if (g_maxKill == 0)
@@ -869,7 +875,7 @@ public Action:Set_Origin(Handle:timer, any:client)
 
 public bool:TraceEntityFilterPlayer(entity, mask, any:data)
 {
-	if (entity != 0)// && IsClientConnected(entity))
+	if (entity != 0)
 		return true;
 
 	if(entity == data)
@@ -897,30 +903,35 @@ stock get_user_weapon_id(const String:weapon[]) // This is order in DM:KD.
 	return 0;
 }
 
-stock SendMsg(client, Tc, const String:format[], any:...) // Good Print By ' HsK
+stock SendMsg(client, Tc, const String:format[], any:...)
 {
 	decl String:buffer[192];
 	VFormat(buffer, sizeof(buffer), format, 4);
 
-	if (client == -1)
-	{
-		for(client=1; client<=GetMaxClients(); client++)
-			if (IsClientConnected(client) && IsClientInGame(client)) SendMsg(client, Tc, buffer);
-
+	if (client != -1 && (!IsClientConnected(client) || !IsClientInGame(client)))
 		return;
-	}
 
-	if (!client || !IsClientConnected(client) || !IsClientInGame(client)) return;
-
-	switch(Tc)
+	if (Tc == 1 || Tc == 4)
 	{
-		case 1: PrintHintText(client, buffer);
-		case 2: PrintToChat(client, "\x04%s\x03", buffer);
-		case 3: PrintCenterText(client, buffer);
-		case 4:
-		{
+		if (client == -1)
+			PrintHintTextToAll (buffer);
+		else
 			PrintHintText(client, buffer);
-			PrintToChat(client, buffer);
-		}
+	}
+	
+	if (Tc == 2 || Tc == 4)
+	{
+		if (client == -1)
+			PrintToChatAll (buffer);
+		else
+			PrintToChat(client, "\x04%s\x03", buffer);
+	}
+	
+	if (Tc == 3)
+	{
+		if (client == -1)
+			PrintCenterTextAll (buffer);
+		else
+			PrintCenterText(client, buffer);
 	}
 }
