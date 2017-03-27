@@ -18,7 +18,7 @@ public Plugin:myinfo =
 	name = "DeathMatch: Kill Duty Source",
 	author = "HsK-Dev Blog By CCN",
 	description = "Deathmatch: Kill Duty Source",
-	version = "2.0.0.8",
+	version = "2.0.0.10",
 	url = "http://ccnhsk-dev.blogspot.com/"
 };
 
@@ -44,12 +44,16 @@ new bool:g_dmGameStart = false;
 new bool:g_dmGameEnd = false;
 new g_maxKill = 0; // Max Kill
 new g_teamCTKill, g_teamTRKill; // CT and TR Kill [tdm]
+new g_topKiller; // Top Killer Id
 
 new Float:g_spawnTime; // Player Respawn Time
 new Float:g_spawnGodTime; // Player Protect Time
+new Float:g_removeDropWeaponTime; // Remove Dropped Weapon Time
 new g_ammoUnlimitbp; // Unlimited Ammo(Magazine)
-new g_removeDropWeapon; // Remove Dropped Weapon
 new g_blockKill; // Block player Suicide
+
+new g_nextMapId;
+new Float:g_changeMapTime;
 
 // Maps & Spawn Point
 new g_mapsCount, String:g_mapsName[64][128];// Ran MAP set
@@ -78,8 +82,8 @@ public OnPluginStart()
 	RegConsoleCmd("say", Command_DmSet);
 
 	HookEvent("round_start", Event_Round_Start, EventHookMode_Post);
+	
 	HookEvent("player_death", Event_PlayerDeath);
-
 	HookEvent("player_spawn", Event_PlayerSpawn);
 
 	LoadTranslations("DeathmatchKD_Source.phrases");
@@ -159,7 +163,7 @@ public LoadDMSettingFile()
 				if(!strcmp(Setting_value[0], "DM MoD", false)) g_dmMode = StringToInt(Setting_value[1]);
 				else if(!strcmp(Setting_value[0], "Player Respawn Time", false)) g_spawnTime = StringToFloat(Setting_value[1]);
 				else if(!strcmp(Setting_value[0], "Player Protect Time", false)) g_spawnGodTime = StringToFloat(Setting_value[1]);
-				else if(!strcmp(Setting_value[0], "Remove Dropped Weapon", false)) g_removeDropWeapon = StringToInt(Setting_value[1]);
+				else if(!strcmp(Setting_value[0], "Remove Dropped Weapon Time", false)) g_removeDropWeaponTime = StringToFloat(Setting_value[1]);
 				else if(!strcmp(Setting_value[0], "Block Player Suicide", false)) g_blockKill = StringToInt(Setting_value[1]);
 				else if(!strcmp(Setting_value[0], "Unlimited Ammo", false)) g_ammoUnlimitbp = StringToInt(Setting_value[1]);
 				else if(!strcmp(Setting_value[0], "Give Grenade (hegrenade, flashbang, smokegrenade)", false)) 
@@ -253,8 +257,8 @@ public LoadRandomMapsFile()
 
 	while (!IsEndOfFile(file) && ReadFileLine(file, linedata, sizeof(linedata)))
 	{
-		g_mapsCount++;
 		g_mapsName[g_mapsCount] = linedata;
+		g_mapsCount++;
 
 		if (g_mapsCount >= sizeof g_mapsName) break;
 	}
@@ -386,6 +390,8 @@ public Action:Event_Round_Start(Handle:event, const String:name[], bool:dontBroa
 
 	for (new player = 1; player <= MAX_NAME_LENGTH; player++)
 	{
+		PlayerDataReset (player);
+	
 		if (!IsClientConnected(player) || !IsClientInGame(player)) continue;
 
 		ingame_player++;
@@ -410,76 +416,36 @@ public Action:CS_OnTerminateRound(&Float:delay, &CSRoundEndReason:reason)
 // ===================
 
 // Dm playing ==================
-public Action:Event_PlayerDeath(Handle:event, const String:name[], bool:dontBroadcast)
+public OnGameFrame ()
 {
-	if (!dm_GameRun ())
-		return;
+	new Float:gameTime = GetGameTime();
 
-	new client = GetClientOfUserId(GetEventInt(event, "userid"));
-	new attacker = GetClientOfUserId(GetEventInt(event, "attacker"));
-	
-	m_spawnTime[client] = GetGameTime() + g_spawnTime;
-
-	m_playerKill[attacker]++;
-	if (g_dmMode == MODE_DM)
-		SendMsg(attacker, 1, "%t", "DM_KILLNUM", m_playerKill[attacker], g_maxKill);
-	else
+	if (g_dmGameEnd)
 	{
-		if (GetClientTeam(attacker) == CS_TEAM_T) g_teamTRKill++;
-		else if (GetClientTeam(attacker) == CS_TEAM_CT) g_teamCTKill++;
-
-		SendMsg(-1, 1, "%t", "TDM_KILLNUM", g_teamCTKill, g_teamTRKill, g_maxKill);
-	}
-
-	if (m_playerKill[attacker] >= g_maxKill || g_teamTRKill >= g_maxKill || g_teamCTKill >= g_maxKill)
-		dm_game_end( GetClientTeam(attacker), attacker, GetRandomInt(0, g_mapsCount-1));
-}
-
-public Action:Event_PlayerSpawn(Handle:event, const String:name[], bool:dontBroadcast)
-{
-	new client = GetClientOfUserId(GetEventInt(event, "userid"));
-	if (g_dmMode == MODE_DM && g_spawnCount > 0)
-		Set_Origin(Handle:0.0, client);
-}
-
-public Action:SDK_TakeDamage(victim, &attacker, &inflictor, &Float:damage, &damagetype)
-{
-	if (!dm_GameRun ())
-		return Plugin_Stop;
-
-	if (m_godMode[victim])
-	{
-		damage *= 0.0;
-		return Plugin_Changed;
-	}
-
-	if (g_dmMode == MODE_DM && attacker)
-	{
-		new Vteam = GetClientTeam(victim);
-
-		if (Vteam == GetClientTeam(attacker))
+		if (g_nextMapId == -1)
+			g_nextMapId = GetRandomInt(0, g_mapsCount-1);
+		else if (g_changeMapTime == -1.0)
+			g_changeMapTime = gameTime + 8.0;
+		else if (g_changeMapTime <= gameTime)
 		{
-			// Set m_iTeamNum, because use CS_SwitchTeam will call jointeam say..
-			// and i don't know block jointeam say xDD'
-			if (Vteam == CS_TEAM_T) SetEntProp(victim,Prop_Data,"m_iTeamNum", CS_TEAM_CT,2);
-			else  SetEntProp(victim,Prop_Data,"m_iTeamNum", CS_TEAM_T,2);
-
-			m_dmdamage[victim] = true;
+			ServerCommand("changelevel %s", g_mapsName[g_nextMapId]);
+			g_nextMapId = -1;
+			g_changeMapTime = -1.0;
+		}
+		else
+		{
+			if (g_dmMode == MODE_DM)
+				SendMsg(-1, 1, "%t", "DM_WIN", g_topKiller, g_mapsName[g_nextMapId]);
+			else
+				SendMsg(-1, 1, "%t", "TDM_WIN", (g_teamTRKill >= g_maxKill) ? "TR" : "CT", g_mapsName[g_nextMapId]);
 		}
 	}
 
-	return Plugin_Continue;
-}
-
-public SDK_TakeDamagePost(victim, attacker, inflictor, Float:damage, damagetype)
-{
-	if (!m_dmdamage[victim])
-		return;
-
-	if (GetClientTeam(victim) == CS_TEAM_T) SetEntProp(victim,Prop_Data,"m_iTeamNum", CS_TEAM_CT,2);
-	else SetEntProp(victim,Prop_Data,"m_iTeamNum", CS_TEAM_T,2);
-
-	m_dmdamage[victim] = false;
+	if (dm_GameRun ())
+	{
+		if (g_dmMode == MODE_TDM)
+			SendMsg(-1, 1, "%t", "TDM_KILLNUM", g_teamCTKill, g_teamTRKill, g_maxKill);
+	}
 }
 
 public SDK_PreThink(client)
@@ -542,6 +508,91 @@ public SDK_PreThink(client)
 			}
 		}
 	}
+	
+	if (dm_GameRun ())
+	{
+		if (g_dmMode == MODE_DM)
+			SendMsg(client, 1, "%t", "DM_KILLNUM", m_playerKill[client], g_maxKill);
+	}
+}
+
+public Action:Event_PlayerDeath(Handle:event, const String:name[], bool:dontBroadcast)
+{
+	if (!dm_GameRun ())
+		return;
+
+	new client = GetClientOfUserId(GetEventInt(event, "userid"));
+	new attacker = GetClientOfUserId(GetEventInt(event, "attacker"));
+	
+	m_spawnTime[client] = GetGameTime() + g_spawnTime;
+	
+	m_playerKill[attacker]++;
+	
+	if (g_topKiller == -1 || m_playerKill[attacker] > m_playerKill[g_topKiller])
+		g_topKiller = attacker;
+	
+	
+	
+	if (g_dmMode == MODE_DM)
+	{
+		if (m_playerKill[attacker] >= g_maxKill)
+			g_dmGameEnd = true;
+	}
+	else
+	{
+		if (GetClientTeam(attacker) == CS_TEAM_T) g_teamTRKill++;
+		else if (GetClientTeam(attacker) == CS_TEAM_CT) g_teamCTKill++;
+	
+		if (g_teamTRKill >= g_maxKill || g_teamCTKill >= g_maxKill)
+			g_dmGameEnd = true;
+	}
+}
+
+public Action:Event_PlayerSpawn(Handle:event, const String:name[], bool:dontBroadcast)
+{
+	new client = GetClientOfUserId(GetEventInt(event, "userid"));
+	if (g_dmMode == MODE_DM && g_spawnCount > 0)
+		Set_Origin(Handle:0.0, client);
+}
+
+public Action:SDK_TakeDamage(victim, &attacker, &inflictor, &Float:damage, &damagetype)
+{
+	if (!dm_GameRun ())
+		return Plugin_Stop;
+
+	if (m_godMode[victim])
+	{
+		damage *= 0.0;
+		return Plugin_Changed;
+	}
+
+	if (g_dmMode == MODE_DM && attacker)
+	{
+		new Vteam = GetClientTeam(victim);
+
+		if (Vteam == GetClientTeam(attacker))
+		{
+			// Set m_iTeamNum, because use CS_SwitchTeam will call jointeam say..
+			// and i don't know block jointeam say xDD'
+			if (Vteam == CS_TEAM_T) SetEntProp(victim,Prop_Data,"m_iTeamNum", CS_TEAM_CT,2);
+			else  SetEntProp(victim,Prop_Data,"m_iTeamNum", CS_TEAM_T,2);
+
+			m_dmdamage[victim] = true;
+		}
+	}
+
+	return Plugin_Continue;
+}
+
+public SDK_TakeDamagePost(victim, attacker, inflictor, Float:damage, damagetype)
+{
+	if (!m_dmdamage[victim])
+		return;
+
+	if (GetClientTeam(victim) == CS_TEAM_T) SetEntProp(victim,Prop_Data,"m_iTeamNum", CS_TEAM_CT,2);
+	else SetEntProp(victim,Prop_Data,"m_iTeamNum", CS_TEAM_T,2);
+
+	m_dmdamage[victim] = false;
 }
 // ===============================
 
@@ -704,25 +755,10 @@ public Player_Spawn(client)
 }
 // ===============================
 
-// Dm game end ====================
-public dm_game_end(winteam, winplayer, next_map)
-{	
-	g_dmGameEnd = true;
-	CreateTimer(8.0, change_map, next_map);
-	if (g_dmMode == MODE_DM)
-		SendMsg(-1, 1, "%t", "DM_WIN", winplayer, g_mapsName[next_map]);
-	else
-		SendMsg(-1, 1, "%t", "TDM_WIN", winteam, g_mapsName[next_map]);
-}
-
-public Action: change_map(Handle:timer, any:next_map )
-	ServerCommand("changelevel %s", g_mapsName[next_map]);
-// ===============================
-
 // Remove Weapon ===============
 public Action:CS_OnCSWeaponDrop(client, weaponIndex) 
 {
-	if (!g_removeDropWeapon)
+	if (g_removeDropWeaponTime <= 0.1)
 		return;
 	
 	CreateTimer(0.1, RemoveWeaponCheck, weaponIndex);
@@ -733,7 +769,7 @@ public Action: RemoveWeaponCheck(Handle:timer, any:weaponIndex )
 {
 	Handle hData = CreateDataPack();
 	WritePackCell(hData, weaponIndex);
-	WritePackCell(hData, GetGameTime()+8.0);
+	WritePackCell(hData, GetGameTime()+g_removeDropWeaponTime);
 	CreateTimer(0.1, RemoveWeapon, hData);
 }
 
@@ -788,11 +824,16 @@ public PlayerDataReset(id)
 
 public GameDataReset()
 {
+	g_nextMapId = -1;
+	g_changeMapTime = -1.0;
+
 	g_dmGameStart = false;
 	g_dmGameEnd = false;
 	g_maxKill = 0;
 	g_teamCTKill = 0;
 	g_teamTRKill = 0;
+	
+	g_topKiller = -1;
 }
 
 public bool:dm_GameRun()
