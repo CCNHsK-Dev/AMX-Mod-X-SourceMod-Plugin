@@ -18,7 +18,7 @@ public Plugin:myinfo =
 	name = "DeathMatch: Kill Duty Source",
 	author = "HsK-Dev Blog By CCN",
 	description = "Deathmatch: Kill Duty Source",
-	version = "2.0.0.15",
+	version = "2.0.0.18",
 	url = "http://ccnhsk-dev.blogspot.com/"
 };
 
@@ -84,6 +84,8 @@ new g_iAccount;
 
 public OnPluginStart()
 {
+	LoadTranslations("DeathmatchKD_Source.phrases");
+
 	RegConsoleCmd("say", Command_DmSet);
 
 	HookEvent("round_start", Event_Round_Start, EventHookMode_Post);
@@ -91,8 +93,6 @@ public OnPluginStart()
 	
 	HookEvent("player_death", Event_PlayerDeath);
 	HookEvent("player_spawn", Event_PlayerSpawn);
-
-	LoadTranslations("DeathmatchKD_Source.phrases");
 
 	AddCommandListener(Command_Kill, "kill");
 	AddCommandListener(Command_ChangeTeam, "jointeam");
@@ -293,7 +293,9 @@ public OnClientPutInServer(client)
 	SDKHook(client, SDKHook_PreThink, SDK_PreThink);
 
 	m_dmdamage[client] = false;
-	m_spawnTime[client] = GetGameTime() + g_spawnTime;
+	
+	if (dm_GameRun())
+		m_spawnTime[client] = GetGameTime() + g_spawnTime;
 }
 
 public OnEntityCreated(entity, const String:classname[])
@@ -389,6 +391,11 @@ public Action:Event_Round_Start(Handle:event, const String:name[], bool:dontBroa
 	
 	if (g_dmMode != MODE_DM)
 		g_dmMode = MODE_TDM;
+		
+	for (new player = 1; player <= MAX_NAME_LENGTH; player++)
+	{
+		PlayerDataReset (player);
+	}
 }
 
 public Action:Event_RoundFreezeEnd(Handle:event, const String:name[], bool:dontBroadcast)
@@ -406,8 +413,6 @@ public Action:Event_RoundFreezeEnd(Handle:event, const String:name[], bool:dontB
 
 	for (new player = 1; player <= MAX_NAME_LENGTH; player++)
 	{
-		PlayerDataReset (player);
-	
 		if (!IsClientConnected(player) || !IsClientInGame(player)) continue;
 
 		ingame_player++;
@@ -422,10 +427,15 @@ public Action:Event_RoundFreezeEnd(Handle:event, const String:name[], bool:dontB
 	else
 		g_maxKill = g_maxKillData;
 	
-	if (g_dmMode == MODE_DM)
-		PrintCenterTextAll("%t", "DM_GS_MSG", g_maxKill);
+	if (g_maxKill > 0)
+	{
+		if (g_dmMode == MODE_DM)
+			PrintCenterTextAll("%t", "DM_GS_MSG", g_maxKill);
+		else
+			PrintCenterTextAll("%t", "TDM_GS_MSG", g_maxKill);
+	}
 	else
-		PrintCenterTextAll("%t", "TDM_GS_MSG", g_maxKill);
+		g_maxKill = -1;
 }
 
 public Action:CS_OnTerminateRound(&Float:delay, &CSRoundEndReason:reason)
@@ -434,6 +444,11 @@ public Action:CS_OnTerminateRound(&Float:delay, &CSRoundEndReason:reason)
 		return Plugin_Continue;
 	
 	return Plugin_Handled;
+}
+
+public dm_roundEnd ()
+{
+	g_dmGameEnd = true;
 }
 // ===================
 
@@ -451,7 +466,7 @@ public dm_showMsg (client)
 		if (g_dmMode == MODE_DM)
 			PrintHintText(client, "%t", "DM_WIN", g_topKiller, g_mapsName[g_nextMapId]);
 		else
-			PrintHintText(client, "%t", "TDM_WIN", (g_teamTRKill >= g_maxKill) ? "TR" : "CT", g_mapsName[g_nextMapId]);
+			PrintHintText(client, "%t", "TDM_WIN", (g_teamTRKill >= g_teamCTKill) ? "TR" : "CT", g_mapsName[g_nextMapId]);
 	
 		return;
 	}
@@ -460,10 +475,16 @@ public dm_showMsg (client)
 		return;
 		
 	if (g_dmMode == MODE_DM)
-		PrintHintText(client, "%t", "DM_KILLNUM", m_playerKill[client], g_maxKill);
+		PrintHintText(client, "%t\n%t\n\n%r", 
+		"MAX_KILL", g_maxKill, 
+		"DM_KILLNUM", m_playerKill[client],
+		"GAME_TIME_MSG", g_maxGameTime, g_gameTime[1], g_gameTime[0]);
 		
 	if (g_dmMode == MODE_TDM)
-		PrintHintText(client, "%t", "TDM_KILLNUM", g_teamCTKill, g_teamTRKill, g_maxKill);
+		PrintHintText(client, "%t\n%t\n\n%t", 
+		"MAX_KILL", g_maxKill, 
+		"TDM_KILLNUM", g_teamCTKill, g_teamTRKill,
+		"GAME_TIME_MSG", g_maxGameTime, g_gameTime[1], g_gameTime[0]);
 }
 // ===================
 
@@ -504,6 +525,9 @@ public OnGameFrame ()
 				g_gameTime[0] = 0;
 				g_gameTime[1]++;
 			}
+			
+			if (g_gameTime[1] >= g_maxGameTime)
+				dm_roundEnd();
 		}
 	}
 	
@@ -531,7 +555,7 @@ public SDK_PreThink(client)
 		}
 	}
 
-	if (m_godMode[client] && (m_godModeTime[client] < gameTime) || !isAlive)
+	if (m_godMode[client] && m_godModeTime[client] < gameTime)
 	{
 		SetEntityRenderMode(client, RENDER_NORMAL);
 		SetEntityRenderFx(client, RENDERFX_NONE);
@@ -589,25 +613,26 @@ public Action:Event_PlayerDeath(Handle:event, const String:name[], bool:dontBroa
 	
 	m_spawnTime[client] = GetGameTime() + g_spawnTime;
 	
+	if (client == attacker)
+		return;
+	
 	m_playerKill[attacker]++;
 	
 	if (g_topKiller == -1 || m_playerKill[attacker] > m_playerKill[g_topKiller])
 		g_topKiller = attacker;
-	
-	
-	
+
 	if (g_dmMode == MODE_DM)
 	{
-		if (m_playerKill[attacker] >= g_maxKill)
-			g_dmGameEnd = true;
+		if (g_maxKill != -1 && m_playerKill[attacker] >= g_maxKill)
+			dm_roundEnd();
 	}
 	else
 	{
 		if (GetClientTeam(attacker) == CS_TEAM_T) g_teamTRKill++;
 		else if (GetClientTeam(attacker) == CS_TEAM_CT) g_teamCTKill++;
 	
-		if (g_teamTRKill >= g_maxKill || g_teamCTKill >= g_maxKill)
-			g_dmGameEnd = true;
+		if (g_maxKill != -1 && (g_teamTRKill >= g_maxKill || g_teamCTKill >= g_maxKill))
+			dm_roundEnd();
 	}
 }
 
@@ -624,19 +649,17 @@ public Action:SDK_TakeDamage(victim, &attacker, &inflictor, &Float:damage, &dama
 		return Plugin_Stop;
 
 	if (m_godMode[victim])
-	{
-		damage *= 0.0;
-		return Plugin_Changed;
-	}
+		return Plugin_Stop;
+		
+	new Vteam = GetClientTeam(victim);
+	new Ateam = GetClientTeam (attacker);
+	if (g_dmMode == MODE_TDM && Vteam == Ateam)
+		return Plugin_Stop;
 
 	if (g_dmMode == MODE_DM && attacker)
 	{
-		new Vteam = GetClientTeam(victim);
-
-		if (Vteam == GetClientTeam(attacker))
+		if (Vteam == Ateam)
 		{
-			// Set m_iTeamNum, because use CS_SwitchTeam will call jointeam say..
-			// and i don't know block jointeam say xDD'
 			if (Vteam == CS_TEAM_T) SetEntProp(victim,Prop_Data,"m_iTeamNum", CS_TEAM_CT,2);
 			else  SetEntProp(victim,Prop_Data,"m_iTeamNum", CS_TEAM_T,2);
 

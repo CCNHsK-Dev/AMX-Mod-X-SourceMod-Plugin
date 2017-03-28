@@ -1,9 +1,15 @@
 "Phrases"
 {
+	"MAX_KILL"
+	{
+		"#format"		"{1:d}"
+		"zho"			"Max Kill:{1}"
+	}
+
 	"DM_KILLNUM"
 	{
-		"#format"		"{1:d},{2:d}"
-		"en"			"Your Kill {1} ^n Max Kill{2}"
+		"#format"		"{1:d}}"
+		"en"			"Your Kill {1}"
 	}
 
 	"DM_WIN"
@@ -14,8 +20,8 @@
 
 	"TDM_KILLNUM"
 	{
-		"#format"		"{1:d},{2:d},{3:d}"
-		"en"			"CT{1} | {2}TR \n Max Kill{3}"
+		"#format"		"{1:d},{2:d}"
+		"en"			"CT{1} | {2}TR"
 	}
 
 	"TDM_WIN"
@@ -33,13 +39,19 @@
 	"DM_GS_MSG"
 	{
 		"#format"		"{1:d}"
-		"en"			"!!!Game StraT!!! Player MiX Kill IS:  {1}"
+		"en"			"!!!Game StraT!!! Player MiX Kill IS: {1}"
 	}
 	
 	"TDM_GS_MSG"
 	{
 		"#format"		"{1:d}"
 		"en"			"!!!Game StraT!!! Team MiX Kill IS: {1}"
+	}
+	
+	"GAME_TIME_MSG"
+	{
+		"#format"		"{1:d},{2:d},{3:d}"
+		"en"			"Round Time:{1}Mins | Game Time {2}:{3}"
 	}
 	
 	"Weapon Menu"

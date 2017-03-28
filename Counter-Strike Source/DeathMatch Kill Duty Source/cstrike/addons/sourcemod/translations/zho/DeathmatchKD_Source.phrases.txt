@@ -1,45 +1,48 @@
 "Phrases"
 {
+	"MAX_KILL"
+	{
+		"zho"			"總殺數:{1}"
+	}
+
 	"DM_KILLNUM"
 	{
-		"#format"		"{1:d},{2:d}"
-		"zho"			"殺數: {1} ^n 總殺數:{2}"
+		"zho"			"殺數: {1}"
 	}
 
 	"DM_WIN"
 	{
-		"#format"		"{1:n},{2:s}"
 		"zho"			"勝利玩家:{1} | 下一張地圖:{2}"
 	}
 
 	"TDM_KILLNUM"
 	{
-		"#format"		"{1:d},{2:d},{3:d}"
-		"zho"			"反恐精英{1} | {2}恐怖份子 \n 總殺數:{3}"
+		"zho"			"反恐精英{1} | {2}恐怖份子"
 	}
 
 	"TDM_WIN"
 	{
-		"#format"		"{1:s},{2:s}"
 		"zho"			"勝利隊伍:{1} | 下一張地圖:{2}"
 	}
 
 	"COUNTDOWN_MSG"
 	{
-		"#format"		"{1:.0f}"
 		"zho"			"遊戲在 {1} 秒後開始"
 	}
 	
 	"DM_GS_MSG"
 	{
-		"#format"		"{1:d}"
 		"zho"			"!!!遊戲開始!!! 個人總殺數是 : {1}"
 	}
 	
 	"TDM_GS_MSG"
 	{
-		"#format"		"{1:d}"
 		"zho"			"!!!遊戲開始!!! 團隊總殺數是 : {1}"
+	}
+	
+	"GAME_TIME_MSG"
+	{
+		"zho"			"Round Time:{1}Mins | Game Time {2}:{3}"
 	}
 	
 	"Weapon Menu"
