@@ -15,7 +15,7 @@
 	"TDM_KILLNUM"
 	{
 		"#format"		"{1:d},{2:d},{3:d}"
-		"en"			"CT{1} | {2}TR ^n Max Kill{3}"
+		"en"			"CT{1} | {2}TR \n Max Kill{3}"
 	}
 
 	"TDM_WIN"
@@ -23,7 +23,25 @@
 		"#format"		"{1:s},{2:s}"
 		"en"			"Win Team:{1} | Next Map:{2}"
 	}
+	
+	"COUNTDOWN_MSG"
+	{
+		"#format"		"{1:.0f}"
+		"en"			"{1} 's will strat game!"
+	}
 
+	"DM_GS_MSG"
+	{
+		"#format"		"{1:d}"
+		"en"			"!!!Game StraT!!! Player MiX Kill IS:  {1}"
+	}
+	
+	"TDM_GS_MSG"
+	{
+		"#format"		"{1:d}"
+		"en"			"!!!Game StraT!!! Team MiX Kill IS: {1}"
+	}
+	
 	"Weapon Menu"
 	{
 		"en"			"[DM:KD-S] Weapon Menu"

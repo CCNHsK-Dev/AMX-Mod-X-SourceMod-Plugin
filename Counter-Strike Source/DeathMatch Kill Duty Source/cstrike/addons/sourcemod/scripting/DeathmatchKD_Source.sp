@@ -18,7 +18,7 @@ public Plugin:myinfo =
 	name = "DeathMatch: Kill Duty Source",
 	author = "HsK-Dev Blog By CCN",
 	description = "Deathmatch: Kill Duty Source",
-	version = "2.0.0.11",
+	version = "2.0.0.15",
 	url = "http://ccnhsk-dev.blogspot.com/"
 };
 
@@ -42,9 +42,14 @@ new const g_BpAmmo[] = { -1, 52, 120, 100, 1, 32, 1, 100, 90, 1, 120, -1, 100, 9
 new g_dmMode = -1; // DM MoD
 new bool:g_dmGameStart = false;
 new bool:g_dmGameEnd = false;
-new g_maxKill = 0; // Max Kill
+
+new Float:g_secondThinkTime; // Second Think
+new g_gameTime[2], g_maxGameTime; // Game Time
+
+new g_maxKill, g_maxKillData; // Max Kill
 new g_teamCTKill, g_teamTRKill; // CT and TR Kill [tdm]
 new g_topKiller; // Top Killer Id
+new Float:g_freezeTime, g_freezeTimeData; // Game Freeze Time
 
 new Float:g_spawnTime; // Player Respawn Time
 new Float:g_spawnGodTime; // Player Protect Time
@@ -52,8 +57,7 @@ new Float:g_removeDropWeaponTime; // Remove Dropped Weapon Time
 new g_ammoUnlimitbp; // Unlimited Ammo(Magazine)
 new g_blockKill; // Block player Suicide
 
-new g_nextMapId;
-new Float:g_changeMapTime;
+new g_nextMapId, Float:g_changeMapTime; // Map Change
 
 // Maps & Spawn Point
 new g_mapsCount, String:g_mapsName[64][128];// Ran MAP set
@@ -61,13 +65,14 @@ new Float:g_spawns[128][3], g_spawnCount; // Ran Spawn set
 
 // Weapon Menu 
 new g_spawnGetGrenade[3]; // Give Grenade
-new g_priweaponNum, g_secweaponNum
-new g_priweaponID[30], g_secweaponID[30];
-new String:g_priweaponName[30][512], String:g_secweaponName[30][512];
+new g_priweaponNum, g_secweaponNum; // Weapon Menu Num
+new g_priweaponID[30], g_secweaponID[30]; // Weapon Menu weapon id
+new String:g_priweaponName[30][512], String:g_secweaponName[30][512]; // Weapon Menu weapon name
 
 // Player vars
-Menu m_menu[MAXPLAYERS + 1];
-new m_menuType[MAXPLAYERS + 1];
+Menu m_menu[MAXPLAYERS + 1];  // For Player Menu
+new m_menuType[MAXPLAYERS + 1]; // For Player Menu
+new Float:m_showMsgTime[MAXPLAYERS + 1]; // Show Msg Time
 new m_priWeaponID[MAXPLAYERS + 1],  m_secWeaponID[MAXPLAYERS + 1]; // Is Weap set
 new bool:m_godMode[MAXPLAYERS + 1], Float:m_godModeTime[MAXPLAYERS + 1]; // Is Protect 
 new Float:m_spawnTime[MAXPLAYERS + 1]; // Player Spawn Time
@@ -121,7 +126,14 @@ public OnConfigsExecuted()
 	LoadDMSettingFile();
 	LoadRandomSpawnFile();
 	LoadRandomMapsFile();
-
+	
+	if (g_freezeTimeData < 5)
+		g_freezeTimeData = 5;
+		
+	if (g_maxGameTime < 5)
+		g_maxGameTime = 5;
+		
+	ServerCommand("mp_freezetime %d", g_freezeTimeData);
 	ServerCommand("mp_timelimit 0");
 	ServerCommand("sv_hudhint_sound 0");
 }
@@ -176,7 +188,9 @@ public LoadDMSettingFile()
 					g_spawnGetGrenade[1] = StringToInt(grenade_class[1]);
 					g_spawnGetGrenade[2] = StringToInt(grenade_class[2]);
 				}
-				else if(!strcmp(Setting_value[0], "Kill WiN", false)) g_maxKill = StringToInt(Setting_value[1]);
+				else if(!strcmp(Setting_value[0], "Freeze Time", false)) g_freezeTimeData = StringToInt(Setting_value[1]);
+				else if(!strcmp(Setting_value[0], "Kill WiN", false)) g_maxKillData = StringToInt(Setting_value[1]);
+				else if(!strcmp(Setting_value[0], "Round Time", false)) g_maxGameTime = StringToInt(Setting_value[1]);
 			}
 			case 2: 
 			{
@@ -371,6 +385,7 @@ public Action:Command_Kill(client, const String:command[], args)
 public Action:Event_Round_Start(Handle:event, const String:name[], bool:dontBroadcast)
 {
 	GameDataReset();
+	g_freezeTime = GetGameTime() + g_freezeTimeData;
 	
 	if (g_dmMode != MODE_DM)
 		g_dmMode = MODE_TDM;
@@ -384,11 +399,7 @@ public Action:Event_RoundFreezeEnd(Handle:event, const String:name[], bool:dontB
 	if (g_dmMode == MODE_DM && g_spawnCount == 0)
 	{
 		g_dmMode = MODE_TDM;
-		SendMsg(-1, 2, "%t", "Have not Spawn Origin In DM");
-		SendMsg(-1, 2, "%t", "Have not Spawn Origin In DM");
-		SendMsg(-1, 2, "%t", "Have not Spawn Origin In DM");
-		SendMsg(-1, 2, "%t", "Have not Spawn Origin In DM");
-		SendMsg(-1, 2, "%t", "Have not Spawn Origin In DM");
+		PrintToChatAll("%t", "Have not Spawn Origin In DM");
 	}
 
 	new ingame_player = 0;
@@ -403,13 +414,18 @@ public Action:Event_RoundFreezeEnd(Handle:event, const String:name[], bool:dontB
 		PlayerSpawn(player);
 	}
 
-	if (g_maxKill == 0)
+	if (g_maxKillData == 0)
 	{
 		if (g_dmMode == MODE_DM) g_maxKill = ingame_player * 2;
 		else g_maxKill = ingame_player * 4;
 	}
-
-	SendMsg(-1, 1, " Max Kill is : %d", g_maxKill);
+	else
+		g_maxKill = g_maxKillData;
+	
+	if (g_dmMode == MODE_DM)
+		PrintCenterTextAll("%t", "DM_GS_MSG", g_maxKill);
+	else
+		PrintCenterTextAll("%t", "TDM_GS_MSG", g_maxKill);
 }
 
 public Action:CS_OnTerminateRound(&Float:delay, &CSRoundEndReason:reason)
@@ -421,11 +437,47 @@ public Action:CS_OnTerminateRound(&Float:delay, &CSRoundEndReason:reason)
 }
 // ===================
 
+// Player Hud MSG =============
+public dm_showMsg (client)
+{
+	if (get_user_bot (client))
+		return;
+			
+	if (g_dmGameEnd)
+	{
+		if (g_nextMapId == -1)
+			return;
+		
+		if (g_dmMode == MODE_DM)
+			PrintHintText(client, "%t", "DM_WIN", g_topKiller, g_mapsName[g_nextMapId]);
+		else
+			PrintHintText(client, "%t", "TDM_WIN", (g_teamTRKill >= g_maxKill) ? "TR" : "CT", g_mapsName[g_nextMapId]);
+	
+		return;
+	}
+	
+	if (!dm_GameRun ())
+		return;
+		
+	if (g_dmMode == MODE_DM)
+		PrintHintText(client, "%t", "DM_KILLNUM", m_playerKill[client], g_maxKill);
+		
+	if (g_dmMode == MODE_TDM)
+		PrintHintText(client, "%t", "TDM_KILLNUM", g_teamCTKill, g_teamTRKill, g_maxKill);
+}
+// ===================
+
 // Dm playing ==================
 public OnGameFrame ()
 {
 	new Float:gameTime = GetGameTime();
 
+	if (!g_dmGameStart)
+	{
+		if (g_secondThinkTime <= gameTime && g_freezeTime > gameTime)
+			PrintCenterTextAll("%t", "COUNTDOWN_MSG", g_freezeTime - gameTime + 1);
+	}
+	
 	if (g_dmGameEnd)
 	{
 		if (g_nextMapId == -1)
@@ -438,20 +490,25 @@ public OnGameFrame ()
 			g_nextMapId = -1;
 			g_changeMapTime = -1.0;
 		}
-		else
-		{
-			if (g_dmMode == MODE_DM)
-				SendMsg(-1, 1, "%t", "DM_WIN", g_topKiller, g_mapsName[g_nextMapId]);
-			else
-				SendMsg(-1, 1, "%t", "TDM_WIN", (g_teamTRKill >= g_maxKill) ? "TR" : "CT", g_mapsName[g_nextMapId]);
-		}
 	}
 
 	if (dm_GameRun ())
 	{
-		if (g_dmMode == MODE_TDM)
-			SendMsg(-1, 1, "%t", "TDM_KILLNUM", g_teamCTKill, g_teamTRKill, g_maxKill);
+		g_freezeTime = -1.0;
+	
+		if (g_secondThinkTime <= gameTime)
+		{
+			g_gameTime[0]++;
+			if (g_gameTime[0] >= 60)
+			{
+				g_gameTime[0] = 0;
+				g_gameTime[1]++;
+			}
+		}
 	}
+	
+	if (g_secondThinkTime <= gameTime)
+		g_secondThinkTime = gameTime + 1.0;
 }
 
 public SDK_PreThink(client)
@@ -515,10 +572,10 @@ public SDK_PreThink(client)
 		}
 	}
 	
-	if (dm_GameRun ())
+	if (m_showMsgTime[client] <= gameTime)
 	{
-		if (g_dmMode == MODE_DM)
-			SendMsg(client, 1, "%t", "DM_KILLNUM", m_playerKill[client], g_maxKill);
+		dm_showMsg (client);
+		m_showMsgTime[client] = gameTime + 1.0;
 	}
 }
 
@@ -826,10 +883,17 @@ public PlayerDataReset(id)
 	m_godMode[id] = false;
 	m_dmdamage[id] = false;
 	m_playerKill[id] = 0;
+	
+	m_showMsgTime[id] = GetGameTime();
 }
 
 public GameDataReset()
 {
+	g_secondThinkTime = GetGameTime();
+
+	g_gameTime[0] = 0;
+	g_gameTime[1] = 0;
+	
 	g_nextMapId = -1;
 	g_changeMapTime = -1.0;
 
@@ -840,6 +904,7 @@ public GameDataReset()
 	g_teamTRKill = 0;
 	
 	g_topKiller = -1;
+	g_freezeTime = -1.0;
 }
 
 public bool:dm_GameRun()
@@ -866,7 +931,7 @@ public Action:Set_Origin(Handle:timer, any:client)
 	{
 		if (TR_GetEntityIndex(trace) != client)
 		{
-			SendMsg(client, 2, "%t", "Debug Stuck");
+			PrintToChat(client, "%t", "Debug Stuck");
 			CreateTimer(0.1, Set_Origin, client);
 		}
 	}
@@ -901,37 +966,4 @@ stock get_user_weapon_id(const String:weapon[]) // This is order in DM:KD.
 		if(!strcmp(weapon, WEAPON_CLASSNAME[i], false)) return i;
 	
 	return 0;
-}
-
-stock SendMsg(client, Tc, const String:format[], any:...)
-{
-	decl String:buffer[192];
-	VFormat(buffer, sizeof(buffer), format, 4);
-
-	if (client != -1 && (!IsClientConnected(client) || !IsClientInGame(client)))
-		return;
-
-	if (Tc == 1 || Tc == 4)
-	{
-		if (client == -1)
-			PrintHintTextToAll (buffer);
-		else
-			PrintHintText(client, buffer);
-	}
-	
-	if (Tc == 2 || Tc == 4)
-	{
-		if (client == -1)
-			PrintToChatAll (buffer);
-		else
-			PrintToChat(client, "\x04%s\x03", buffer);
-	}
-	
-	if (Tc == 3)
-	{
-		if (client == -1)
-			PrintCenterTextAll (buffer);
-		else
-			PrintCenterText(client, buffer);
-	}
 }
