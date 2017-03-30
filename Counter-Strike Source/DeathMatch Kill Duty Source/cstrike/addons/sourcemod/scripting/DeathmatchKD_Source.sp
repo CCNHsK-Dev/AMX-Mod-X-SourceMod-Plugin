@@ -18,7 +18,7 @@ public Plugin:myinfo =
 	name = "DeathMatch: Kill Duty Source",
 	author = "HsK-Dev Blog By CCN",
 	description = "Deathmatch: Kill Duty Source",
-	version = "2.0.0.18",
+	version = "2.0.0.19",
 	url = "http://ccnhsk-dev.blogspot.com/"
 };
 
@@ -402,6 +402,7 @@ public Action:Event_RoundFreezeEnd(Handle:event, const String:name[], bool:dontB
 {
 	g_dmGameStart = true;
 	g_dmGameEnd = false;
+	g_freezeTime = GetGameTime() + 2.0;
 	
 	if (g_dmMode == MODE_DM && g_spawnCount == 0)
 	{
@@ -427,14 +428,7 @@ public Action:Event_RoundFreezeEnd(Handle:event, const String:name[], bool:dontB
 	else
 		g_maxKill = g_maxKillData;
 	
-	if (g_maxKill > 0)
-	{
-		if (g_dmMode == MODE_DM)
-			PrintCenterTextAll("%t", "DM_GS_MSG", g_maxKill);
-		else
-			PrintCenterTextAll("%t", "TDM_GS_MSG", g_maxKill);
-	}
-	else
+	if (g_maxKill <= 0)
 		g_maxKill = -1;
 }
 
@@ -453,10 +447,16 @@ public dm_roundEnd ()
 // ===================
 
 // Player Hud MSG =============
-public dm_showMsg (client)
+public dm_showMsg (client, Float:gameTime)
 {
 	if (get_user_bot (client))
 		return;
+	
+	new String:Text[512];
+	new len = 0;
+	
+	if (!g_dmGameStart)
+		len += Format(Text[len], sizeof(Text)-len, "%T", "COUNTDOWN_MSG", client, g_freezeTime - gameTime + 1);
 			
 	if (g_dmGameEnd)
 	{
@@ -464,27 +464,34 @@ public dm_showMsg (client)
 			return;
 		
 		if (g_dmMode == MODE_DM)
-			PrintHintText(client, "%t", "DM_WIN", g_topKiller, g_mapsName[g_nextMapId]);
+			len += Format(Text[len], sizeof(Text)-len, "%T", "DM_WIN", client, g_topKiller, g_mapsName[g_nextMapId]);
 		else
-			PrintHintText(client, "%t", "TDM_WIN", (g_teamTRKill >= g_teamCTKill) ? "TR" : "CT", g_mapsName[g_nextMapId]);
-	
-		return;
+			len += Format(Text[len], sizeof(Text)-len, "%T", "TDM_WIN", client,
+			(g_teamTRKill >= g_teamCTKill) ? "TR" : "CT", g_mapsName[g_nextMapId]);
 	}
 	
-	if (!dm_GameRun ())
-		return;
+	if (dm_GameRun ())
+	{
+		if (g_freezeTime >= gameTime)
+		{
+			if (g_dmMode == MODE_DM)
+				PrintCenterText(client, "%t", "DM_GS_MSG", g_maxKill);
+			else
+				PrintCenterText(client, "%t", "TDM_GS_MSG", g_maxKill);
+		}
+	
+		if (g_maxKill != -1)
+			len += Format(Text[len], sizeof(Text)-len, "%T\n", "MAX_KILL", client, g_maxKill);
 		
-	if (g_dmMode == MODE_DM)
-		PrintHintText(client, "%t\n%t\n\n%r", 
-		"MAX_KILL", g_maxKill, 
-		"DM_KILLNUM", m_playerKill[client],
-		"GAME_TIME_MSG", g_maxGameTime, g_gameTime[1], g_gameTime[0]);
+		if (g_dmMode == MODE_DM)
+			len += Format(Text[len], sizeof(Text)-len, "%T\n\n", "DM_KILLNUM", client, m_playerKill[client]);
+		else
+			len += Format(Text[len], sizeof(Text)-len, "%T\n\n", "TDM_KILLNUM", client, g_teamCTKill, g_teamTRKill);
 		
-	if (g_dmMode == MODE_TDM)
-		PrintHintText(client, "%t\n%t\n\n%t", 
-		"MAX_KILL", g_maxKill, 
-		"TDM_KILLNUM", g_teamCTKill, g_teamTRKill,
-		"GAME_TIME_MSG", g_maxGameTime, g_gameTime[1], g_gameTime[0]);
+		len += Format(Text[len], sizeof(Text)-len, "%T", "GAME_TIME_MSG", client, g_maxGameTime, g_gameTime[1], g_gameTime[0]);
+	}
+	
+	PrintHintText (client, Text);
 }
 // ===================
 
@@ -492,12 +499,6 @@ public dm_showMsg (client)
 public OnGameFrame ()
 {
 	new Float:gameTime = GetGameTime();
-
-	if (!g_dmGameStart)
-	{
-		if (g_secondThinkTime <= gameTime && g_freezeTime > gameTime)
-			PrintCenterTextAll("%t", "COUNTDOWN_MSG", g_freezeTime - gameTime + 1);
-	}
 	
 	if (g_dmGameEnd)
 	{
@@ -515,8 +516,6 @@ public OnGameFrame ()
 
 	if (dm_GameRun ())
 	{
-		g_freezeTime = -1.0;
-	
 		if (g_secondThinkTime <= gameTime)
 		{
 			g_gameTime[0]++;
@@ -598,7 +597,7 @@ public SDK_PreThink(client)
 	
 	if (m_showMsgTime[client] <= gameTime)
 	{
-		dm_showMsg (client);
+		dm_showMsg (client, gameTime);
 		m_showMsgTime[client] = gameTime + 1.0;
 	}
 }
@@ -702,22 +701,22 @@ public Get_Weapon_Menu(client)
 	new String:Value[64];
 	m_menu[client] = new Menu(Handler_Menu, MENU_ACTIONS_ALL);
 	
-	Format(Value, sizeof(Value), "%t", "Weapon Menu");
+	Format(Value, sizeof(Value), "%t", "Weapon Menu", client);
 	m_menu[client].SetTitle("%s?", Value);
 
-	Format(Value, sizeof(Value), "%t", "Use New Weapon");
+	Format(Value, sizeof(Value), "%t", "Use New Weapon", client);
 	m_menu[client].AddItem(Value, Value);
 	
-	Format(Value, sizeof(Value), "%t", "Use Last-Time Weapon");
+	Format(Value, sizeof(Value), "%t", "Use Last-Time Weapon", client);
 	m_menu[client].AddItem(Value, Value);
 	
-	Format(Value, sizeof(Value), "%t :", "Your Last Time Weapon");
+	Format(Value, sizeof(Value), "%t :", "Your Last Time Weapon", client);
 	m_menu[client].AddItem(Value, Value);
 	
-	Format(Value, sizeof(Value), "%s", g_priweaponName[m_priWeaponID[client]]);
+	Format(Value, sizeof(Value), "%s", g_priweaponName[m_priWeaponID[client]], client);
 	m_menu[client].AddItem(Value, Value);
 	
-	Format(Value, sizeof(Value), "%s", g_secweaponName[m_secWeaponID[client]]);
+	Format(Value, sizeof(Value), "%s", g_secweaponName[m_secWeaponID[client]], client);
 	m_menu[client].AddItem(Value, Value);
 		
 	m_menu[client].ExitButton = false;
