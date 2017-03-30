@@ -54,6 +54,12 @@
 		"en"			"Round Time:{1}Mins | Game Time {2}:{3}"
 	}
 	
+	"INEV_RES_MSG"
+	{
+		"#format"		"{1:.0f}"
+		"en"			"{1} 's will Spawn"
+	}
+	
 	"Weapon Menu"
 	{
 		"en"			"[DM:KD-S] Weapon Menu"
@@ -87,10 +93,5 @@
 	"Have not Spawn Origin In DM"
 	{
 		"en"			"*** [DM ERROR]Have not Spawn Origin, Game Mod Set to Team DM  ***"
-	}
-
-	"Debug Stuck"
-	{
-		"en"			"*** [DM ERROR] Player Stuck!! ***"
 	}
 }

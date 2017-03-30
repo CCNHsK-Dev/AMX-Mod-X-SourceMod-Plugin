@@ -18,7 +18,7 @@ public Plugin:myinfo =
 	name = "DeathMatch: Kill Duty Source",
 	author = "HsK-Dev Blog By CCN",
 	description = "Deathmatch: Kill Duty Source",
-	version = "2.0.0.19",
+	version = "2.0.0.20",
 	url = "http://ccnhsk-dev.blogspot.com/"
 };
 
@@ -53,6 +53,7 @@ new Float:g_freezeTime, g_freezeTimeData; // Game Freeze Time
 
 new Float:g_spawnTime; // Player Respawn Time
 new Float:g_spawnGodTime; // Player Protect Time
+new Float:g_enforcementSpawnTime; // Player Enforcement Spawn Time
 new Float:g_removeDropWeaponTime; // Remove Dropped Weapon Time
 new g_ammoUnlimitbp; // Unlimited Ammo(Magazine)
 new g_blockKill; // Block player Suicide
@@ -76,6 +77,7 @@ new Float:m_showMsgTime[MAXPLAYERS + 1]; // Show Msg Time
 new m_priWeaponID[MAXPLAYERS + 1],  m_secWeaponID[MAXPLAYERS + 1]; // Is Weap set
 new bool:m_godMode[MAXPLAYERS + 1], Float:m_godModeTime[MAXPLAYERS + 1]; // Is Protect 
 new Float:m_spawnTime[MAXPLAYERS + 1]; // Player Spawn Time
+new Float:m_enforcementSpawnTime[MAXPLAYERS + 1]; // Player Enforcement Spawn Time
 new bool:m_dmdamage[MAXPLAYERS + 1]; // DM Damage
 new m_playerKill[MAXPLAYERS + 1]; // Player Kill [pdm]
 
@@ -177,6 +179,7 @@ public LoadDMSettingFile()
 				if(!strcmp(Setting_value[0], "DM MoD", false)) g_dmMode = StringToInt(Setting_value[1]);
 				else if(!strcmp(Setting_value[0], "Player Respawn Time", false)) g_spawnTime = StringToFloat(Setting_value[1]);
 				else if(!strcmp(Setting_value[0], "Player Protect Time", false)) g_spawnGodTime = StringToFloat(Setting_value[1]);
+				else if(!strcmp(Setting_value[0], "Player Enforcement Respawn Time", false)) g_enforcementSpawnTime = StringToFloat(Setting_value[1]);
 				else if(!strcmp(Setting_value[0], "Remove Dropped Weapon Time", false)) g_removeDropWeaponTime = StringToFloat(Setting_value[1]);
 				else if(!strcmp(Setting_value[0], "Block Player Suicide", false)) g_blockKill = StringToInt(Setting_value[1]);
 				else if(!strcmp(Setting_value[0], "Unlimited Ammo", false)) g_ammoUnlimitbp = StringToInt(Setting_value[1]);
@@ -407,7 +410,7 @@ public Action:Event_RoundFreezeEnd(Handle:event, const String:name[], bool:dontB
 	if (g_dmMode == MODE_DM && g_spawnCount == 0)
 	{
 		g_dmMode = MODE_TDM;
-		PrintToChatAll("%t", "Have not Spawn Origin In DM");
+		PrintToChatAll("%T", "Have not Spawn Origin In DM");
 	}
 
 	new ingame_player = 0;
@@ -456,7 +459,10 @@ public dm_showMsg (client, Float:gameTime)
 	new len = 0;
 	
 	if (!g_dmGameStart)
-		len += Format(Text[len], sizeof(Text)-len, "%T", "COUNTDOWN_MSG", client, g_freezeTime - gameTime + 1);
+	{
+		if (g_freezeTime >= gameTime)
+			len += Format(Text[len], sizeof(Text)-len, "%T", "COUNTDOWN_MSG", client, g_freezeTime - gameTime + 1);
+	}
 			
 	if (g_dmGameEnd)
 	{
@@ -472,13 +478,16 @@ public dm_showMsg (client, Float:gameTime)
 	
 	if (dm_GameRun ())
 	{
-		if (g_freezeTime >= gameTime)
+		if (g_freezeTime >= gameTime && g_maxKill > 0)
 		{
 			if (g_dmMode == MODE_DM)
-				PrintCenterText(client, "%t", "DM_GS_MSG", g_maxKill);
+				PrintCenterText(client, "%T", "DM_GS_MSG", client, g_maxKill);
 			else
-				PrintCenterText(client, "%t", "TDM_GS_MSG", g_maxKill);
+				PrintCenterText(client, "%T", "TDM_GS_MSG", client, g_maxKill);
 		}
+		
+		if (m_enforcementSpawnTime[client] > gameTime && m_enforcementSpawnTime[client] != -1.0)
+			PrintCenterText(client, "%T", "INEV_RES_MSG", client, m_enforcementSpawnTime[client] - gameTime + 1);
 	
 		if (g_maxKill != -1)
 			len += Format(Text[len], sizeof(Text)-len, "%T\n", "MAX_KILL", client, g_maxKill);
@@ -491,7 +500,8 @@ public dm_showMsg (client, Float:gameTime)
 		len += Format(Text[len], sizeof(Text)-len, "%T", "GAME_TIME_MSG", client, g_maxGameTime, g_gameTime[1], g_gameTime[0]);
 	}
 	
-	PrintHintText (client, Text);
+	if (len > 0)
+		PrintHintText (client, Text);
 }
 // ===================
 
@@ -549,6 +559,9 @@ public SDK_PreThink(client)
 			m_spawnTime[client] = gameTime + 0.5;
 		else
 		{
+			if (!isAlive && g_enforcementSpawnTime > 0.0)
+				m_enforcementSpawnTime[client] = gameTime + g_enforcementSpawnTime;
+		
 			m_spawnTime[client] = -1.0;
 			PlayerSpawn(client);
 		}
@@ -579,6 +592,7 @@ public SDK_PreThink(client)
 	if (isAlive)
 	{
 		SetEntData(client, g_iAccount, 0);
+		m_enforcementSpawnTime[client] = -1.0;
 
 		if (g_ammoUnlimitbp)
 		{
@@ -594,8 +608,13 @@ public SDK_PreThink(client)
 			}
 		}
 	}
+	else if ((team == CS_TEAM_T || team == CS_TEAM_CT))
+	{
+		if (m_enforcementSpawnTime[client] != -1.0 && m_enforcementSpawnTime[client] <= gameTime)
+			CS_RespawnPlayer(client);
+	}
 	
-	if (m_showMsgTime[client] <= gameTime)
+	if (m_showMsgTime[client] <= gameTime && (team == CS_TEAM_T || team == CS_TEAM_CT))
 	{
 		dm_showMsg (client, gameTime);
 		m_showMsgTime[client] = gameTime + 1.0;
@@ -689,7 +708,7 @@ public PlayerSpawn(client)
 
 public Get_Weapon_Menu(client)
 {
-	if ((m_secWeaponID[client] == 0 && m_priWeaponID[client] == 0) || get_user_bot(client))
+	if ((m_secWeaponID[client] == -1 && m_priWeaponID[client] == -1) || get_user_bot(client))
 	{
 		Send_Pri_Weapon_Menu(client);
 		return;
@@ -701,22 +720,22 @@ public Get_Weapon_Menu(client)
 	new String:Value[64];
 	m_menu[client] = new Menu(Handler_Menu, MENU_ACTIONS_ALL);
 	
-	Format(Value, sizeof(Value), "%t", "Weapon Menu", client);
+	Format(Value, sizeof(Value), "%T", "Weapon Menu", client);
 	m_menu[client].SetTitle("%s?", Value);
 
-	Format(Value, sizeof(Value), "%t", "Use New Weapon", client);
+	Format(Value, sizeof(Value), "%T", "Use New Weapon", client);
 	m_menu[client].AddItem(Value, Value);
 	
-	Format(Value, sizeof(Value), "%t", "Use Last-Time Weapon", client);
+	Format(Value, sizeof(Value), "%T", "Use Last-Time Weapon", client);
 	m_menu[client].AddItem(Value, Value);
 	
-	Format(Value, sizeof(Value), "%t :", "Your Last Time Weapon", client);
+	Format(Value, sizeof(Value), "%T:", "Your Last Time Weapon", client);
 	m_menu[client].AddItem(Value, Value);
 	
-	Format(Value, sizeof(Value), "%s", g_priweaponName[m_priWeaponID[client]], client);
+	Format(Value, sizeof(Value), "%s", g_priweaponName[m_priWeaponID[client]]);
 	m_menu[client].AddItem(Value, Value);
 	
-	Format(Value, sizeof(Value), "%s", g_secweaponName[m_secWeaponID[client]], client);
+	Format(Value, sizeof(Value), "%s", g_secweaponName[m_secWeaponID[client]]);
 	m_menu[client].AddItem(Value, Value);
 		
 	m_menu[client].ExitButton = false;
@@ -738,7 +757,7 @@ public Send_Pri_Weapon_Menu(client)
 	new String:Value[64];
 	m_menu[client] = new Menu(Handler_Menu, MENU_ACTIONS_ALL);
 	
-	Format(Value, sizeof(Value), "%t", "Pri Weapon Menu");
+	Format(Value, sizeof(Value), "%T", "Pri Weapon Menu", client);
 	m_menu[client].SetTitle("%s?", Value);
 	
 	for (new i = 0; i < g_priweaponNum; i++)
@@ -766,7 +785,7 @@ public Send_Sec_Weapon_Menu(client)
 	new String:Value[64];
 	m_menu[client] = new Menu(Handler_Menu, MENU_ACTIONS_ALL);
 	
-	Format(Value, sizeof(Value), "%t", "Sec Weapon Menu");
+	Format(Value, sizeof(Value), "%T", "Sec Weapon Menu", client);
 	m_menu[client].SetTitle("%s?", Value);
 	
 	for (new i = 0; i < g_secweaponNum; i++)
@@ -829,10 +848,13 @@ public Player_Spawn(client)
 
 	GivePlayerItem(client, "item_assaultsuit", 0);
 
-	m_godModeTime[client] = GetGameTime () + g_spawnGodTime;
+	m_godModeTime[client] = GetGameTime() + g_spawnGodTime;
 
-	GivePlayerItem(client, WEAPON_CLASSNAME[g_secweaponID[m_secWeaponID[client]]]);
-	GivePlayerItem(client, WEAPON_CLASSNAME[g_priweaponID[m_priWeaponID[client]]]);
+	if (m_secWeaponID[client] >= 0)
+		GivePlayerItem(client, WEAPON_CLASSNAME[g_secweaponID[m_secWeaponID[client]]]);
+		
+	if (m_priWeaponID[client] >= 0)
+		GivePlayerItem(client, WEAPON_CLASSNAME[g_priweaponID[m_priWeaponID[client]]]);
 
 	if (g_spawnGetGrenade[0]) GivePlayerItem(client, "weapon_hegrenade");
 	if (g_spawnGetGrenade[1]) GivePlayerItem(client, "weapon_flashbang");
@@ -898,10 +920,11 @@ public PlayerDataReset(id)
 	m_menu[id] = null;
 	m_menuType[id] = 0;
 
-	m_priWeaponID[id] = 0;
-	m_secWeaponID[id] = 0;
+	m_priWeaponID[id] = -1;
+	m_secWeaponID[id] = -1;
 	m_godModeTime[id] = -1.0;
 	m_spawnTime[id] = -1.0;
+	m_enforcementSpawnTime[id] = -1.0;
 	m_godMode[id] = false;
 	m_dmdamage[id] = false;
 	m_playerKill[id] = 0;
@@ -952,10 +975,7 @@ public Action:Set_Origin(Handle:timer, any:client)
 	if (TR_DidHit(trace))
 	{
 		if (TR_GetEntityIndex(trace) != client)
-		{
-			PrintToChat(client, "%t", "Debug Stuck");
 			CreateTimer(0.1, Set_Origin, client);
-		}
 	}
 	CloseHandle(trace);
 }

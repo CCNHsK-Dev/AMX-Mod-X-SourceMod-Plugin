@@ -45,6 +45,11 @@
 		"zho"			"Round Time:{1}Mins | Game Time {2}:{3}"
 	}
 	
+	"INEV_RES_MSG"
+	{
+		"zho"			"{1} 秒後張被強制復活"
+	}
+	
 	"Weapon Menu"
 	{
 		"zho"			"[DM: KD-S] 選擇你的武器"
@@ -78,10 +83,5 @@
 	"Have not Spawn Origin In DM"
 	{
 		"zho"			"*** [DM ERROR] 本地圖沒有重生點, 因此遊戲模式改為團隊死鬥  ***"
-	}
-
-	"Debug Stuck"
-	{
-		"zho"			"*** [DM ERROR] 玩家卡著了... ***"
 	}
 }
