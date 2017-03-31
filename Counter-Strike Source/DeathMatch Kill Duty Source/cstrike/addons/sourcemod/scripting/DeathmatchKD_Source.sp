@@ -18,7 +18,7 @@ public Plugin:myinfo =
 	name = "DeathMatch: Kill Duty Source",
 	author = "HsK-Dev Blog By CCN",
 	description = "Deathmatch: Kill Duty Source",
-	version = "2.0.0.23",
+	version = "2.0.0.25",
 	url = "http://ccnhsk-dev.blogspot.com/"
 };
 
@@ -98,6 +98,7 @@ public OnPluginStart()
 	HookEvent("player_spawn", Event_PlayerSpawn);
 
 	AddCommandListener(Command_Kill, "kill");
+	AddCommandListener(Command_ChangeTeam, "autoteam");
 	AddCommandListener(Command_ChangeTeam, "jointeam");
 	AddCommandListener(Command_ChangeTeam, "chooseteam");
 
@@ -346,8 +347,7 @@ public OnClientPutInServer(client)
 
 	m_dmdamage[client] = false;
 	
-	if (dm_GameRun())
-		m_spawnTime[client] = GetGameTime() + g_spawnTime;
+	FakeClientCommandEx(client,"jointeam 5");
 }
 
 public OnEntityCreated(entity, const String:classname[])
@@ -417,13 +417,28 @@ public Dm_Game_Set_Menu(client)
 // Block Command ======
 public Action:Command_ChangeTeam(client, const String:command[], args)
 {
-	if (!client || !IsClientConnected(client) || !IsClientInGame(client))
+	if (!client || !IsClientConnected(client))
 		return Plugin_Continue;
 
 	if (GetClientTeam(client) == CS_TEAM_T || GetClientTeam(client) == CS_TEAM_CT)
 		return Plugin_Stop;
+	
+	new joinTeam;
+	if (GetTeamClientCount(2) > GetTeamClientCount(3))
+		joinTeam = 3;
+	else if (GetTeamClientCount(3) > GetTeamClientCount(2))
+		joinTeam = 2;
+	else 
+		joinTeam = GetRandomInt (2, 3);
+	
+	CS_SwitchTeam(client, joinTeam);
+	
+	if (!dm_GameRun())
+		CS_RespawnPlayer (client);
+	else 
+		m_spawnTime[client] = GetGameTime() + g_spawnTime;
 
-	return Plugin_Continue;
+	return Plugin_Handled;
 }
 
 public Action:Command_Kill(client, const String:command[], args)
@@ -505,7 +520,7 @@ public dm_roundEnd ()
 // Player Hud MSG =============
 public dm_showMsg (client, Float:gameTime)
 {
-	if (get_user_bot (client))
+	if (IsFakeClient (client))
 		return;
 	
 	new String:Text[512];
@@ -774,7 +789,7 @@ public PlayerSpawn(client)
 
 public Get_Weapon_Menu(client)
 {
-	if ((m_secWeaponID[client] == -1 && m_priWeaponID[client] == -1) || get_user_bot(client))
+	if ((m_secWeaponID[client] == -1 && m_priWeaponID[client] == -1) || IsFakeClient(client))
 	{
 		Send_Pri_Weapon_Menu(client);
 		return;
@@ -810,7 +825,7 @@ public Get_Weapon_Menu(client)
 
 public Send_Pri_Weapon_Menu(client)
 {
-	if (get_user_bot(client)) 
+	if (IsFakeClient(client)) 
 	{
 		m_priWeaponID[client] = GetRandomInt(0, g_priweaponNum-1);
 		Send_Sec_Weapon_Menu(client);
@@ -838,7 +853,7 @@ public Send_Pri_Weapon_Menu(client)
 
 public Send_Sec_Weapon_Menu(client)
 {
-	if (get_user_bot(client)) 
+	if (IsFakeClient(client)) 
 	{
 		m_secWeaponID[client] = GetRandomInt(0, g_secweaponNum-1);
 		Player_Spawn(client);
@@ -1053,28 +1068,6 @@ public Set_Origin(client)
 		setOrigin = 0;
 		TeleportEntity(client, spawnOrigin, NULL_VECTOR, NULL_VECTOR);
 	}
-}
-
-public bool:TraceEntityFilterPlayer(entity, mask, any:data)
-{
-	if (entity != 0)
-		return true;
-
-	if(entity == data)
-		return false;
-		
-	return true;
-}
-
-get_user_bot(client) // Beacuse i know bot steam id is 'BOT'
-{
-	if (!client || !IsClientConnected(client) || !IsClientInGame(client)) return false;
-
-	new String:SteamID[50];
-	GetClientAuthId(client, AuthId_Steam3, SteamID, sizeof(SteamID));
-
-	if (StrEqual(SteamID, "BOT")) return true;
-	else return false;
 }
 
 stock get_user_weapon_id(const String:weapon[]) // This is order in DM:KD.
