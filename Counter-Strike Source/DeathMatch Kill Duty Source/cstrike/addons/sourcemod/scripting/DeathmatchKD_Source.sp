@@ -18,7 +18,7 @@ public Plugin:myinfo =
 	name = "DeathMatch: Kill Duty Source",
 	author = "HsK-Dev Blog By CCN",
 	description = "Deathmatch: Kill Duty Source",
-	version = "2.0.0.20",
+	version = "2.0.0.22",
 	url = "http://ccnhsk-dev.blogspot.com/"
 };
 
@@ -57,6 +57,7 @@ new Float:g_enforcementSpawnTime; // Player Enforcement Spawn Time
 new Float:g_removeDropWeaponTime; // Remove Dropped Weapon Time
 new g_ammoUnlimitbp; // Unlimited Ammo(Magazine)
 new g_blockKill; // Block player Suicide
+new g_dmKillEnemyAddHP; // DM Mode Kill Enemy Kill HP
 
 new g_nextMapId, Float:g_changeMapTime; // Map Change
 
@@ -124,7 +125,8 @@ public OnConfigsExecuted()
 		SDKUnhook(id, SDKHook_OnTakeDamagePost, SDK_TakeDamagePost);
 		SDKUnhook(id, SDKHook_PreThink, SDK_PreThink);
 	}
-
+	
+	DMBaseSetting();
 	LoadDMSettingFile();
 	LoadRandomSpawnFile();
 	LoadRandomMapsFile();
@@ -142,6 +144,40 @@ public OnConfigsExecuted()
 // ==================================
 
 // DM:KD-S Setting =========
+public DMBaseSetting()
+{
+	g_dmMode = MODE_TDM;
+	g_spawnTime = 3.0;
+	g_spawnGodTime = 3.0;
+	g_enforcementSpawnTime = 8.0;
+	g_removeDropWeaponTime = 8.0;
+	g_blockKill = 1;
+	g_ammoUnlimitbp = 1;
+	g_spawnGetGrenade[0] = 0;
+	g_spawnGetGrenade[1] = 0;
+	g_spawnGetGrenade[2] = 0;
+	g_freezeTimeData = 10;
+	g_maxKillData = 0;
+	g_maxGameTime = 20;
+	g_dmKillEnemyAddHP = 20;
+	
+	g_priweaponNum = 3;
+	g_priweaponID[0] = get_user_weapon_id("weapon_awp");
+	Format(g_priweaponName[0], sizeof(g_priweaponName), "AWP");
+	g_priweaponID[1] = get_user_weapon_id("weapon_m4a1");
+	Format(g_priweaponName[1], sizeof(g_priweaponName), "M4A1");
+	g_priweaponID[2] = get_user_weapon_id("weapon_ak47");
+	Format(g_priweaponName[2], sizeof(g_priweaponName), "AK47/CV47");
+	
+	g_secweaponNum = 3;
+	g_secweaponID[0] = get_user_weapon_id("weapon_glock18");
+	Format(g_secweaponName[0], sizeof(g_secweaponName), "Glock 18");
+	g_secweaponID[1] = get_user_weapon_id("weapon_usp");
+	Format(g_secweaponName[1], sizeof(g_secweaponName), "USP");
+	g_secweaponID[2] = get_user_weapon_id("weapon_deagle");
+	Format(g_secweaponName[2], sizeof(g_secweaponName), "DEAGLE");
+}
+
 public LoadDMSettingFile()
 {
 	new String:path[255];
@@ -194,22 +230,29 @@ public LoadDMSettingFile()
 				else if(!strcmp(Setting_value[0], "Freeze Time", false)) g_freezeTimeData = StringToInt(Setting_value[1]);
 				else if(!strcmp(Setting_value[0], "Kill WiN", false)) g_maxKillData = StringToInt(Setting_value[1]);
 				else if(!strcmp(Setting_value[0], "Round Time", false)) g_maxGameTime = StringToInt(Setting_value[1]);
+				else if(!strcmp(Setting_value[0], "Kill Enemy Add HP", false)) g_dmKillEnemyAddHP = StringToInt(Setting_value[1]);
 			}
 			case 2: 
 			{
 				ExplodeString(linedata, ",", weapon_get, 2, 256);
-
-				g_priweaponID[g_priweaponNum] = get_user_weapon_id(weapon_get[0]);
-				g_priweaponName[g_priweaponNum] = weapon_get[1];
-				g_priweaponNum += 1;
+				
+				if (g_priweaponNum < 30)
+				{
+					g_priweaponID[g_priweaponNum] = get_user_weapon_id(weapon_get[0]);
+					g_priweaponName[g_priweaponNum] = weapon_get[1];
+					g_priweaponNum += 1;
+				}
 			}
 			case 3: 
 			{
 				ExplodeString(linedata, ",", weapon_get, 2, 256);
 
-				g_secweaponID[g_secweaponNum] = get_user_weapon_id(weapon_get[0]);
-				g_secweaponName[g_secweaponNum] = weapon_get[1];
-				g_secweaponNum += 1;
+				if (g_secweaponNum < 30)
+				{
+					g_secweaponID[g_secweaponNum] = get_user_weapon_id(weapon_get[0]);
+					g_secweaponName[g_secweaponNum] = weapon_get[1];
+					g_secweaponNum += 1;
+				}
 			}
 		}
 	}
@@ -641,6 +684,15 @@ public Action:Event_PlayerDeath(Handle:event, const String:name[], bool:dontBroa
 
 	if (g_dmMode == MODE_DM)
 	{
+		if (g_dmKillEnemyAddHP > 0)
+		{
+			new health = GetClientHealth(attacker) + g_dmKillEnemyAddHP;
+			if (health > 100)
+				SetEntityHealth(attacker, 100);
+			else
+				SetEntityHealth(attacker, health);
+		}
+	
 		if (g_maxKill != -1 && m_playerKill[attacker] >= g_maxKill)
 			dm_roundEnd();
 	}
@@ -669,12 +721,16 @@ public Action:SDK_TakeDamage(victim, &attacker, &inflictor, &Float:damage, &dama
 	if (m_godMode[victim])
 		return Plugin_Stop;
 		
+	if (!attacker)
+		return Plugin_Continue;
+		
 	new Vteam = GetClientTeam(victim);
 	new Ateam = GetClientTeam (attacker);
+	
 	if (g_dmMode == MODE_TDM && Vteam == Ateam)
 		return Plugin_Stop;
 
-	if (g_dmMode == MODE_DM && attacker)
+	if (g_dmMode == MODE_DM)
 	{
 		if (Vteam == Ateam)
 		{
