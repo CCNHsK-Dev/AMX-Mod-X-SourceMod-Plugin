@@ -18,7 +18,7 @@ public Plugin:myinfo =
 	name = "DeathMatch: Kill Duty Source",
 	author = "HsK-Dev Blog By CCN",
 	description = "Deathmatch: Kill Duty Source",
-	version = "2.0.0.22",
+	version = "2.0.0.23",
 	url = "http://ccnhsk-dev.blogspot.com/"
 };
 
@@ -116,20 +116,17 @@ public OnConfigsExecuted()
 
 	g_dmMode = -1;
 	GameDataReset();
-	
-	for (new id = 1; id <= MAX_NAME_LENGTH; id++)
-	{
-		PlayerDataReset (id);
-
-		SDKUnhook(id, SDKHook_OnTakeDamage, SDK_TakeDamage);
-		SDKUnhook(id, SDKHook_OnTakeDamagePost, SDK_TakeDamagePost);
-		SDKUnhook(id, SDKHook_PreThink, SDK_PreThink);
-	}
-	
+		
 	DMBaseSetting();
 	LoadDMSettingFile();
 	LoadRandomSpawnFile();
 	LoadRandomMapsFile();
+	
+	if (g_dmMode == MODE_DM && g_spawnCount == 0)
+	{
+		g_dmMode = MODE_TDM;
+		PrintToChatAll("%T", "Have not Spawn Origin In DM");
+	}
 	
 	if (g_freezeTimeData < 5)
 		g_freezeTimeData = 5;
@@ -140,6 +137,15 @@ public OnConfigsExecuted()
 	ServerCommand("mp_freezetime %d", g_freezeTimeData);
 	ServerCommand("mp_timelimit 0");
 	ServerCommand("sv_hudhint_sound 0");
+	
+	for (new id = 1; id <= MAX_NAME_LENGTH; id++)
+	{
+		PlayerDataReset (id);
+
+		SDKUnhook(id, SDKHook_OnTakeDamage, SDK_TakeDamage);
+		SDKUnhook(id, SDKHook_OnTakeDamagePost, SDK_TakeDamagePost);
+		SDKUnhook(id, SDKHook_PreThink, SDK_PreThink);
+	}
 }
 // ==================================
 
@@ -434,7 +440,7 @@ public Action:Event_Round_Start(Handle:event, const String:name[], bool:dontBroa
 {
 	GameDataReset();
 	g_freezeTime = GetGameTime() + g_freezeTimeData;
-	
+		
 	if (g_dmMode != MODE_DM)
 		g_dmMode = MODE_TDM;
 		
@@ -450,12 +456,6 @@ public Action:Event_RoundFreezeEnd(Handle:event, const String:name[], bool:dontB
 	g_dmGameEnd = false;
 	g_freezeTime = GetGameTime() + 2.0;
 	
-	if (g_dmMode == MODE_DM && g_spawnCount == 0)
-	{
-		g_dmMode = MODE_TDM;
-		PrintToChatAll("%T", "Have not Spawn Origin In DM");
-	}
-
 	new ingame_player = 0;
 
 	for (new player = 1; player <= MAX_NAME_LENGTH; player++)
@@ -489,6 +489,16 @@ public Action:CS_OnTerminateRound(&Float:delay, &CSRoundEndReason:reason)
 public dm_roundEnd ()
 {
 	g_dmGameEnd = true;
+	
+	if (g_dmMode == MODE_TDM)
+	{
+		if (g_teamCTKill > g_teamTRKill)
+			EmitSoundToAll ("radio/ctwin.wav");
+		else
+			EmitSoundToAll ("radio/terwin.wav");
+	}
+	else
+		EmitSoundToAll ("radio/terwin.wav");
 }
 // ===================
 
@@ -709,8 +719,8 @@ public Action:Event_PlayerDeath(Handle:event, const String:name[], bool:dontBroa
 public Action:Event_PlayerSpawn(Handle:event, const String:name[], bool:dontBroadcast)
 {
 	new client = GetClientOfUserId(GetEventInt(event, "userid"));
-	if (g_dmMode == MODE_DM && g_spawnCount > 0)
-		Set_Origin(Handle:0.0, client);
+	if (g_dmMode == MODE_DM && IsPlayerAlive (client))
+		Set_Origin(client);
 }
 
 public Action:SDK_TakeDamage(victim, &attacker, &inflictor, &Float:damage, &damagetype)
@@ -1013,27 +1023,36 @@ public bool:dm_GameRun()
 	return (g_dmGameStart && !g_dmGameEnd);
 }
 
-public Action:Set_Origin(Handle:timer, any:client)
+public Set_Origin(client)
 {
-	new Float:spawn_or[3];
-	spawn_or = g_spawns[GetRandomInt(0, g_spawnCount-1)];
-
-	TeleportEntity(client, spawn_or, NULL_VECTOR, NULL_VECTOR);
-
-	new Float:Player_Origin[3], Float:fMins[3], Float:fMaxs[3], Float:ang[3];
-	GetEntPropVector(client, Prop_Send, "m_vecOrigin", Player_Origin);
-	GetClientMaxs(client, fMaxs);
-	GetClientMins(client, fMins);
-	GetClientAbsAngles(client, ang);
-
-	new Handle:trace = TR_TraceHullFilterEx(Player_Origin, ang, fMins, fMaxs, MASK_ALL, TraceEntityFilterPlayer);
-
-	if (TR_DidHit(trace))
+	new setOrigin = 1;
+	while (setOrigin)
 	{
-		if (TR_GetEntityIndex(trace) != client)
-			CreateTimer(0.1, Set_Origin, client);
+		new workSpawnPoint = 1;
+		new Float:spawnOrigin[3];
+		spawnOrigin = g_spawns[GetRandomInt(0, g_spawnCount-1)];
+		
+		for (new player = 1; player <= MAX_NAME_LENGTH; player++)
+		{
+			if (client == player || !IsClientConnected(player) || !IsClientInGame(player) || !IsPlayerAlive (player))
+				continue;
+			
+			new Float:Player_Origin[3];
+			GetEntPropVector(player, Prop_Send, "m_vecOrigin", Player_Origin);
+				
+			if (GetVectorDistance (Player_Origin, spawnOrigin) > 80)
+				continue;
+			
+			workSpawnPoint = 0;
+			break;
+		}
+		
+		if (workSpawnPoint == 0)
+			continue;
+			
+		setOrigin = 0;
+		TeleportEntity(client, spawnOrigin, NULL_VECTOR, NULL_VECTOR);
 	}
-	CloseHandle(trace);
 }
 
 public bool:TraceEntityFilterPlayer(entity, mask, any:data)
