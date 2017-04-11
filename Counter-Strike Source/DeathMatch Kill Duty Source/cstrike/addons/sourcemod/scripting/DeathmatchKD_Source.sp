@@ -18,7 +18,7 @@ public Plugin:myinfo =
 	name = "DeathMatch: Kill Duty Source",
 	author = "HsK-Dev Blog By CCN",
 	description = "Deathmatch: Kill Duty Source",
-	version = "2.0.0.25",
+	version = "2.0.0.26",
 	url = "http://ccnhsk-dev.blogspot.com/"
 };
 
@@ -503,6 +503,15 @@ public Action:CS_OnTerminateRound(&Float:delay, &CSRoundEndReason:reason)
 
 public dm_roundEnd ()
 {
+	if (!dm_GameRun ())
+		return;
+	
+	if (g_maxKill == -1)
+	{
+		if (g_dmMode == MODE_TDM && g_teamCTKill == g_teamTRKill)
+			return;
+	}
+
 	g_dmGameEnd = true;
 	
 	if (g_dmMode == MODE_TDM)
@@ -602,10 +611,10 @@ public OnGameFrame ()
 				g_gameTime[0] = 0;
 				g_gameTime[1]++;
 			}
-			
-			if (g_gameTime[1] >= g_maxGameTime)
-				dm_roundEnd();
 		}
+		
+		if (g_gameTime[1] >= g_maxGameTime)
+			dm_roundEnd();
 	}
 	
 	if (g_secondThinkTime <= gameTime)
