@@ -1,7 +1,7 @@
 
 /* 
 			DeathMatch: Kill Duty Source - Upgrade 1
-				xx/4/2017 (Version: 2.0)
+				xx/10/2017 (Version: 2.0)
 			
 					HsK-Dev Blog By CCN
 			
@@ -18,7 +18,7 @@ public Plugin:myinfo =
 	name = "DeathMatch: Kill Duty Source",
 	author = "HsK-Dev Blog By CCN",
 	description = "Deathmatch: Kill Duty Source",
-	version = "2.0.0.27",
+	version = "2.0.0.28",
 	url = "http://ccnhsk-dev.blogspot.com/"
 };
 
@@ -107,14 +107,6 @@ public OnPluginStart()
 
 public OnConfigsExecuted()
 {
-	g_spawnCount = 0;
-	for (new i = 0; i < 128; i++)
-	{
-		g_spawns[i][0] = 0.0;
-		g_spawns[i][1] = 0.0;
-		g_spawns[i][2] = 0.0;
-	}
-
 	g_dmMode = -1;
 	GameDataReset();
 		
@@ -122,6 +114,14 @@ public OnConfigsExecuted()
 	LoadDMSettingFile();
 	LoadRandomSpawnFile();
 	LoadRandomMapsFile();
+	
+	if (g_mapsCount == 0)
+	{
+		g_mapsCount++;
+		new String:mapName[128];
+		GetCurrentMap(mapName, sizeof(mapName));
+		Format(g_mapsName[0], sizeof(g_mapsName), "%s", mapName);
+	}
 	
 	if (g_dmMode == MODE_DM && g_spawnCount == 0)
 	{
@@ -191,7 +191,8 @@ public LoadDMSettingFile()
 	Format(path, sizeof(path), "cfg/DmKD-S/DeathmatchKD-S_Setting.cfg");
 
 	new Handle:file = OpenFile(path, "rt");
-	if (file == INVALID_HANDLE) return;
+	if (file == INVALID_HANDLE)
+		return;
 
 	new section, String:linedata[512];
 	new String:Setting_value[2][256] , String:weapon_get[2][256];
@@ -270,12 +271,21 @@ public LoadDMSettingFile()
 // Ran Spawn Save/Load ====
 public LoadRandomSpawnFile()
 {
+	g_spawnCount = 0;
+	for (new i = 0; i < 128; i++)
+	{
+		g_spawns[i][0] = 0.0;
+		g_spawns[i][1] = 0.0;
+		g_spawns[i][2] = 0.0;
+	}
+
 	new String:path[255], String:mapName[128];
 	GetCurrentMap(mapName, sizeof(mapName));
 	Format(path, sizeof(path), "cfg/DmKD-S/spawn/%s.cfg", mapName);
 
 	new Handle:file = OpenFile(path, "rt");
-	if (file == INVALID_HANDLE) return;
+	if (file == INVALID_HANDLE)
+		return;
 
 	new String:linedata[512];
 	new String:spawn_origin[3][64];
@@ -295,7 +305,7 @@ public LoadRandomSpawnFile()
 	CloseHandle(file);
 }
 
-public save_ranspawn(client)
+public SaveRandomSpawn(client)
 {
 	new String:path[255], String:mapName[128], Float:Player_Origin[3], String:Save_path[254];
 	GetCurrentMap(mapName, sizeof(mapName));
@@ -315,21 +325,24 @@ public save_ranspawn(client)
 // Next Maps =========================
 public LoadRandomMapsFile()
 {
+	g_mapsCount = 0;
+
 	new String:path[255];
 	Format(path, sizeof(path), "cfg/DmKD-S/maps.cfg");
 
 	new Handle:file = OpenFile(path, "rt");
-	if (file == INVALID_HANDLE) return;
+	if (file == INVALID_HANDLE)
+		return;
 
 	new String:linedata[128];
-	g_mapsCount = 0;
 
 	while (!IsEndOfFile(file) && ReadFileLine(file, linedata, sizeof(linedata)))
 	{
 		g_mapsName[g_mapsCount] = linedata;
 		g_mapsCount++;
 
-		if (g_mapsCount >= sizeof g_mapsName) break;
+		if (g_mapsCount >= sizeof g_mapsName)
+			break;
 	}
 
 	CloseHandle(file);
@@ -521,6 +534,28 @@ public dm_roundEnd ()
 	else
 		EmitSoundToAll ("radio/terwin.wav");
 }
+
+public dm_changeNextMap (Float:gameTime)
+{
+	if (dm_GameRun ())
+	{
+		g_nextMapId = -1;
+		g_changeMapTime = -1.0;
+		return;
+	}
+	
+	if (g_nextMapId == -1)
+		g_nextMapId = GetRandomInt(0, g_mapsCount-1);
+
+	if (g_changeMapTime == -1.0)
+		g_changeMapTime = gameTime + 8.0;
+	else if (g_changeMapTime <= gameTime)
+	{
+		ServerCommand("changelevel %s", g_mapsName[g_nextMapId]);
+		g_nextMapId = -1;
+		g_changeMapTime = -1.0;
+	}
+}
 // ===================
 
 // Player Hud MSG =============
@@ -585,18 +620,7 @@ public OnGameFrame ()
 	new Float:gameTime = GetGameTime();
 	
 	if (g_dmGameEnd)
-	{
-		if (g_nextMapId == -1)
-			g_nextMapId = GetRandomInt(0, g_mapsCount-1);
-		else if (g_changeMapTime == -1.0)
-			g_changeMapTime = gameTime + 8.0;
-		else if (g_changeMapTime <= gameTime)
-		{
-			ServerCommand("changelevel %s", g_mapsName[g_nextMapId]);
-			g_nextMapId = -1;
-			g_changeMapTime = -1.0;
-		}
-	}
+		dm_changeNextMap (gameTime);
 
 	if (dm_GameRun ())
 	{
@@ -911,7 +935,7 @@ public int Handler_Menu(Menu:menu, MenuAction:action, param1, param2)
 		else if (m_menuType[param1] == 10)
 		{
 			Dm_Game_Set_Menu(param1);
-			save_ranspawn(param1);
+			SaveRandomSpawn(param1);
 		}
 	}
 
@@ -957,7 +981,6 @@ public Action:CS_OnCSWeaponDrop(client, weaponIndex)
 	
 	CreateTimer(0.1, RemoveWeaponCheck, weaponIndex);
 }
-
 
 public Action: RemoveWeaponCheck(Handle:timer, any:weaponIndex )
 {
