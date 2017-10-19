@@ -18,7 +18,7 @@ public Plugin:myinfo =
 	name = "DeathMatch: Kill Duty Source",
 	author = "HsK-Dev Blog By CCN",
 	description = "Deathmatch: Kill Duty Source",
-	version = "2.0.0.28",
+	version = "2.0.0.30",
 	url = "http://ccnhsk-dev.blogspot.com/"
 };
 
@@ -26,8 +26,8 @@ public Plugin:myinfo =
 #define MODE_DM                 1
 
 // Block hostage and c4 [reference amxx plugin]
-new const String:OBJECTIVE_ENTITYS[][] = { "func_vehicleclip", "func_buyzone", "func_hostage_rescue", "func_bomb_target", 
-	"hostage_entity", "info_hostage_rescue", "info_bomb_target", "prop_physics_multiplayer" }
+new const String:OBJECTIVE_ENTITYS[][] = { "func_vehicleclip", "func_hostage_rescue", "func_bomb_target", 
+	"hostage_entity", "info_hostage_rescue", "info_bomb_target", "prop_physics_multiplayer", "func_buyzone" }
 
 // This order reference [cstrike.inc] 
 new const String:WEAPON_CLASSNAME[][] = {  "",  "weapon_p228", "weapon_glock", "weapon_scout", "weapon_hegrenade", "weapon_xm1014", 
@@ -57,7 +57,10 @@ new Float:g_enforcementSpawnTime; // Player Enforcement Spawn Time
 new Float:g_removeDropWeaponTime; // Remove Dropped Weapon Time
 new g_ammoUnlimitbp; // Unlimited Ammo(Magazine)
 new g_blockKill; // Block player Suicide
-new g_dmKillEnemyAddHP; // DM Mode Kill Enemy Kill HP
+new g_tdmBuyZoneAddHpStart; // TDM Mode BuyZone Add HP On 
+new Float:g_tdmBuyZoneAddHpTime; // TDM Mode BuyZone Add HP Time
+new g_tdmBuyZoneAddHp; // TDM Mode BuyZone Add HP
+new g_dmKillEnemyAddHP; // DM Mode Kill Enemy Add HP
 
 new g_nextMapId, Float:g_changeMapTime; // Map Change
 
@@ -104,6 +107,7 @@ public OnPluginStart()
 
 	g_iAccount = FindSendPropInfo("CCSPlayer", "m_iAccount");
 }
+
 
 public OnConfigsExecuted()
 {
@@ -166,6 +170,10 @@ public DMBaseSetting()
 	g_freezeTimeData = 10;
 	g_maxKillData = 0;
 	g_maxGameTime = 20;
+	
+	g_tdmBuyZoneAddHpStart = 1;
+	g_tdmBuyZoneAddHpTime = 5.0;
+	g_tdmBuyZoneAddHp = 10;
 	g_dmKillEnemyAddHP = 20;
 	
 	g_priweaponNum = 3;
@@ -238,6 +246,11 @@ public LoadDMSettingFile()
 				else if(!strcmp(Setting_value[0], "Freeze Time", false)) g_freezeTimeData = StringToInt(Setting_value[1]);
 				else if(!strcmp(Setting_value[0], "Kill WiN", false)) g_maxKillData = StringToInt(Setting_value[1]);
 				else if(!strcmp(Setting_value[0], "Round Time", false)) g_maxGameTime = StringToInt(Setting_value[1]);
+				
+				else if(!strcmp(Setting_value[0], "Buyzone Add HP", false)) g_tdmBuyZoneAddHpStart = StringToInt(Setting_value[1]);
+				else if(!strcmp(Setting_value[0], "Buyzone Add HP Time", false)) g_tdmBuyZoneAddHpTime = StringToFloat(Setting_value[1]);
+				else if(!strcmp(Setting_value[0], "Buyzone Add HP Amount", false)) g_tdmBuyZoneAddHp = StringToInt(Setting_value[1]);
+
 				else if(!strcmp(Setting_value[0], "Kill Enemy Add HP", false)) g_dmKillEnemyAddHP = StringToInt(Setting_value[1]);
 			}
 			case 2: 
@@ -365,7 +378,8 @@ public OnClientPutInServer(client)
 
 public OnEntityCreated(entity, const String:classname[])
 {
-	if (!IsValidEntity(entity) || !IsValidEdict(entity)) return;
+	if (!IsValidEntity(entity) || !IsValidEdict(entity))
+		return;
 
 	SDKHook(entity, SDKHook_SpawnPost, SDK_SpawnPost);
 }
@@ -458,7 +472,10 @@ public Action:Command_Kill(client, const String:command[], args)
 {
 	if (!client || !IsClientConnected(client) || !g_blockKill)
 		return Plugin_Continue;
-
+		
+	new iBuyZoneOffset = FindSendPropInfo("CCSPlayer", "m_bInBuyZone");
+	PrintToChat(client, "TESTTEST %d", GetEntData(client, iBuyZoneOffset));
+		
 	return Plugin_Handled;
 }
 // =======================
@@ -566,7 +583,7 @@ public dm_showMsg (client, Float:gameTime)
 	
 	new String:Text[512];
 	new len = 0;
-	
+
 	if (!g_dmGameStart)
 	{
 		if (g_freezeTime >= gameTime)
@@ -650,7 +667,7 @@ public SDK_PreThink(client)
 	new isAlive = IsPlayerAlive(client);
 	new team = GetClientTeam(client);
 	new Float:gameTime = GetGameTime();
-	
+
 	if (m_spawnTime[client] != -1.0 && m_spawnTime[client] <= gameTime)
 	{
 		if (team != CS_TEAM_T && team != CS_TEAM_CT)
@@ -690,6 +707,7 @@ public SDK_PreThink(client)
 	if (isAlive)
 	{
 		SetEntData(client, g_iAccount, 0);
+		
 		m_enforcementSpawnTime[client] = -1.0;
 
 		if (g_ammoUnlimitbp)
@@ -789,8 +807,10 @@ public Action:SDK_TakeDamage(victim, &attacker, &inflictor, &Float:damage, &dama
 	{
 		if (Vteam == Ateam)
 		{
-			if (Vteam == CS_TEAM_T) SetEntProp(victim,Prop_Data,"m_iTeamNum", CS_TEAM_CT,2);
-			else  SetEntProp(victim,Prop_Data,"m_iTeamNum", CS_TEAM_T,2);
+			if (Vteam == CS_TEAM_T)
+				SetEntProp(victim,Prop_Data,"m_iTeamNum", CS_TEAM_CT,2);
+			else 
+				SetEntProp(victim,Prop_Data,"m_iTeamNum", CS_TEAM_T,2);
 
 			m_dmdamage[victim] = true;
 		}
@@ -801,11 +821,16 @@ public Action:SDK_TakeDamage(victim, &attacker, &inflictor, &Float:damage, &dama
 
 public SDK_TakeDamagePost(victim, attacker, inflictor, Float:damage, damagetype)
 {
+	new iBuyZoneOffset = FindSendPropInfo("CCSPlayer", "m_bInBuyZone");
+	PrintToChat(attacker, "TESTTEST %d", GetEntData(attacker, iBuyZoneOffset));
+
 	if (!m_dmdamage[victim])
 		return;
 
-	if (GetClientTeam(victim) == CS_TEAM_T) SetEntProp(victim,Prop_Data,"m_iTeamNum", CS_TEAM_CT,2);
-	else SetEntProp(victim,Prop_Data,"m_iTeamNum", CS_TEAM_T,2);
+	if (GetClientTeam(victim) == CS_TEAM_T)
+		SetEntProp(victim,Prop_Data,"m_iTeamNum", CS_TEAM_CT,2);
+	else
+		SetEntProp(victim,Prop_Data,"m_iTeamNum", CS_TEAM_T,2);
 
 	m_dmdamage[victim] = false;
 }
@@ -1013,7 +1038,9 @@ public Action: RemoveWeapon(Handle hTimer, Handle hData)
 // Remove Entity =========
 public SDK_SpawnPost(entity)
 {
-	if(!IsValidEntity(entity)) return;
+	if(!IsValidEntity(entity))
+		return;
+		
 	decl String:ent_name[64];
 	GetEdictClassname(entity, ent_name, sizeof(ent_name));
 
