@@ -1,7 +1,7 @@
 
 /* 
 			DeathMatch: Kill Duty Source - Upgrade 1
-				xx/10/2017 (Version: 2.0)
+				19/2/2018 (Version: 2.0)
 			
 					HsK-Dev Blog By CCN
 			
@@ -18,7 +18,7 @@ public Plugin:myinfo =
 	name = "DeathMatch: Kill Duty Source",
 	author = "HsK-Dev Blog By CCN",
 	description = "Deathmatch: Kill Duty Source",
-	version = "2.0.0.30",
+	version = "2.0.0.31",
 	url = "http://ccnhsk-dev.blogspot.com/"
 };
 
@@ -27,7 +27,7 @@ public Plugin:myinfo =
 
 // Block hostage and c4 [reference amxx plugin]
 new const String:OBJECTIVE_ENTITYS[][] = { "func_vehicleclip", "func_hostage_rescue", "func_bomb_target", 
-	"hostage_entity", "info_hostage_rescue", "info_bomb_target", "prop_physics_multiplayer", "func_buyzone" }
+	"hostage_entity", "info_hostage_rescue", "info_bomb_target", "prop_physics_multiplayer"}
 
 // This order reference [cstrike.inc] 
 new const String:WEAPON_CLASSNAME[][] = {  "",  "weapon_p228", "weapon_glock", "weapon_scout", "weapon_hegrenade", "weapon_xm1014", 
@@ -92,8 +92,6 @@ public OnPluginStart()
 {
 	LoadTranslations("DeathmatchKD_Source.phrases");
 
-	RegConsoleCmd("say", Command_DmSet);
-
 	HookEvent("round_start", Event_Round_Start, EventHookMode_Post);
 	HookEvent("round_freeze_end",Event_RoundFreezeEnd);
 	
@@ -105,6 +103,12 @@ public OnPluginStart()
 	AddCommandListener(Command_ChangeTeam, "jointeam");
 	AddCommandListener(Command_ChangeTeam, "chooseteam");
 
+	RegConsoleCmd("say", Command_DmSet);
+	
+	RegConsoleCmd("chooseteam ", Command_BlockGameMenu);
+	RegConsoleCmd("buyequip", Command_BlockGameMenu);
+	RegConsoleCmd("buymenu", Command_BlockGameMenu);
+	
 	g_iAccount = FindSendPropInfo("CCSPlayer", "m_iAccount");
 }
 
@@ -398,9 +402,10 @@ public OnClientDisconnect(client)
 // DM Set Menu============
 public Action:Command_DmSet(client, args)
 {
-	if (!client) client++;  
-	else
-		if (!GetUserAdmin(client)) return Plugin_Handled;
+	PrintToChatAll("%d", client);
+
+	if (!GetUserAdmin(client))
+		return Plugin_Continue;
 
 	decl String:text[192];
 	if (GetCmdArgString(text, sizeof(text)) < 1)  return Plugin_Continue;
@@ -470,11 +475,25 @@ public Action:Command_ChangeTeam(client, const String:command[], args)
 
 public Action:Command_Kill(client, const String:command[], args)
 {
+	PrintToChatAll("%d", client);
+
 	if (!client || !IsClientConnected(client) || !g_blockKill)
 		return Plugin_Continue;
 		
-	new iBuyZoneOffset = FindSendPropInfo("CCSPlayer", "m_bInBuyZone");
-	PrintToChat(client, "TESTTEST %d", GetEntData(client, iBuyZoneOffset));
+	new inBuyZone = GetEntProp( client, Prop_Send, "m_bInBuyZone" );
+	PrintToChat(client, "TESTTEST %d", inBuyZone);
+
+	return Plugin_Handled;
+}
+// =======================
+
+// Block Game Menu ========
+public Action:Command_BlockGameMenu(client, args)
+{
+	PrintToChatAll("%d", client);
+
+	if (!client || !IsClientConnected(client))
+		return Plugin_Continue;
 		
 	return Plugin_Handled;
 }
@@ -821,9 +840,9 @@ public Action:SDK_TakeDamage(victim, &attacker, &inflictor, &Float:damage, &dama
 
 public SDK_TakeDamagePost(victim, attacker, inflictor, Float:damage, damagetype)
 {
-	new iBuyZoneOffset = FindSendPropInfo("CCSPlayer", "m_bInBuyZone");
-	PrintToChat(attacker, "TESTTEST %d", GetEntData(attacker, iBuyZoneOffset));
-
+	new inBuyZone = GetEntProp( attacker, Prop_Send, "m_bInBuyZone" );
+	PrintToChat(attacker, "TESTTEST %d", inBuyZone);
+	
 	if (!m_dmdamage[victim])
 		return;
 
