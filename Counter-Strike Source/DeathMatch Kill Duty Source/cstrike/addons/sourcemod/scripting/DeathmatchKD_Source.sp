@@ -18,7 +18,7 @@ public Plugin:myinfo =
 	name = "DeathMatch: Kill Duty Source",
 	author = "HsK-Dev Blog By CCN",
 	description = "Deathmatch: Kill Duty Source",
-	version = "2.0.0.31",
+	version = "2.0.0.33",
 	url = "http://ccnhsk-dev.blogspot.com/"
 };
 
@@ -84,6 +84,8 @@ new Float:m_spawnTime[MAXPLAYERS + 1]; // Player Spawn Time
 new Float:m_enforcementSpawnTime[MAXPLAYERS + 1]; // Player Enforcement Spawn Time
 new bool:m_dmdamage[MAXPLAYERS + 1]; // DM Damage
 new m_playerKill[MAXPLAYERS + 1]; // Player Kill [pdm]
+new bool:m_inBuyZone[MAXPLAYERS + 1], Float:m_inBuyZoneCheckTime[MAXPLAYERS + 1]; // TDM Mode BuyZone Add HP
+new Float:m_inBuyZoneAddHPTime[MAXPLAYERS + 1];
 
 // Game Offset
 new g_iAccount;
@@ -92,22 +94,21 @@ public OnPluginStart()
 {
 	LoadTranslations("DeathmatchKD_Source.phrases");
 
+	RegConsoleCmd("say", Command_DmSet);
+
 	HookEvent("round_start", Event_Round_Start, EventHookMode_Post);
 	HookEvent("round_freeze_end",Event_RoundFreezeEnd);
 	
 	HookEvent("player_death", Event_PlayerDeath);
 	HookEvent("player_spawn", Event_PlayerSpawn);
 
+	AddCommandListener(Command_BlockGameBuyMenu, "buyequip");
+	AddCommandListener(Command_BlockGameBuyMenu, "buymenu");
+	
 	AddCommandListener(Command_Kill, "kill");
 	AddCommandListener(Command_ChangeTeam, "autoteam");
 	AddCommandListener(Command_ChangeTeam, "jointeam");
 	AddCommandListener(Command_ChangeTeam, "chooseteam");
-
-	RegConsoleCmd("say", Command_DmSet);
-	
-	RegConsoleCmd("chooseteam ", Command_BlockGameMenu);
-	RegConsoleCmd("buyequip", Command_BlockGameMenu);
-	RegConsoleCmd("buymenu", Command_BlockGameMenu);
 	
 	g_iAccount = FindSendPropInfo("CCSPlayer", "m_iAccount");
 }
@@ -374,7 +375,7 @@ public OnClientPutInServer(client)
 	SDKHook(client, SDKHook_OnTakeDamage, SDK_TakeDamage);
 	SDKHook(client, SDKHook_OnTakeDamagePost, SDK_TakeDamagePost);
 	SDKHook(client, SDKHook_PreThink, SDK_PreThink);
-
+	
 	m_dmdamage[client] = false;
 	
 	FakeClientCommandEx(client,"jointeam 5");
@@ -384,6 +385,9 @@ public OnEntityCreated(entity, const String:classname[])
 {
 	if (!IsValidEntity(entity) || !IsValidEdict(entity))
 		return;
+		
+	if(!strcmp(classname, "func_buyzone", false))
+		SDKHook(entity, SDKHook_TouchPost, SDK_TouchPost);
 
 	SDKHook(entity, SDKHook_SpawnPost, SDK_SpawnPost);
 }
@@ -402,7 +406,8 @@ public OnClientDisconnect(client)
 // DM Set Menu============
 public Action:Command_DmSet(client, args)
 {
-	PrintToChatAll("%d", client);
+	if (!client)
+		client++;
 
 	if (!GetUserAdmin(client))
 		return Plugin_Continue;
@@ -475,29 +480,18 @@ public Action:Command_ChangeTeam(client, const String:command[], args)
 
 public Action:Command_Kill(client, const String:command[], args)
 {
-	PrintToChatAll("%d", client);
-
-	if (!client || !IsClientConnected(client) || !g_blockKill)
+	if (!g_blockKill || !client || !IsClientConnected(client))
 		return Plugin_Continue;
-		
-	new inBuyZone = GetEntProp( client, Prop_Send, "m_bInBuyZone" );
-	PrintToChat(client, "TESTTEST %d", inBuyZone);
 
 	return Plugin_Handled;
 }
-// =======================
 
-// Block Game Menu ========
-public Action:Command_BlockGameMenu(client, args)
+public Action:Command_BlockGameBuyMenu(client, const String:command[], args)
 {
-	PrintToChatAll("%d", client);
-
-	if (!client || !IsClientConnected(client))
-		return Plugin_Continue;
-		
 	return Plugin_Handled;
 }
 // =======================
+
 
 // Cs Round Set ===========
 public Action:Event_Round_Start(Handle:event, const String:name[], bool:dontBroadcast)
@@ -742,9 +736,38 @@ public SDK_PreThink(client)
 					SetEntData(client, ammo_offset, g_BpAmmo[weaponID]);
 			}
 		}
+		
+		if (g_dmMode == MODE_TDM && g_tdmBuyZoneAddHpStart)
+		{
+			if (m_inBuyZoneCheckTime[client] != -1.0 && m_inBuyZoneCheckTime[client] <= gameTime)
+			{
+				m_inBuyZone[client] = false;
+				m_inBuyZoneCheckTime[client] = -1.0;
+				m_inBuyZoneAddHPTime[client] = -1.0;
+				PrintToChat(client, "You out the buy zone");
+			}
+			
+			if (!m_inBuyZone[client])
+				m_inBuyZoneAddHPTime[client] = -1.0;
+			else if (m_inBuyZoneAddHPTime[client] != -1.0 && m_inBuyZoneAddHPTime[client] <= gameTime)
+			{
+				PrintToChat(client, "Buy Zone Add HP");
+				m_inBuyZoneAddHPTime[client] = gameTime + g_tdmBuyZoneAddHpTime + 0.1;
+					
+				new health = GetClientHealth(client) + g_tdmBuyZoneAddHp;
+				if (health > 100)
+					SetEntityHealth(client, 100);
+				else
+					SetEntityHealth(client, health);
+			}
+		}
 	}
 	else if ((team == CS_TEAM_T || team == CS_TEAM_CT))
 	{
+		m_inBuyZone[client] = false;
+		m_inBuyZoneCheckTime[client] = -1.0;
+		m_inBuyZoneAddHPTime[client] = -1.0;
+	
 		if (m_enforcementSpawnTime[client] != -1.0 && m_enforcementSpawnTime[client] <= gameTime)
 			CS_RespawnPlayer(client);
 	}
@@ -840,9 +863,6 @@ public Action:SDK_TakeDamage(victim, &attacker, &inflictor, &Float:damage, &dama
 
 public SDK_TakeDamagePost(victim, attacker, inflictor, Float:damage, damagetype)
 {
-	new inBuyZone = GetEntProp( attacker, Prop_Send, "m_bInBuyZone" );
-	PrintToChat(attacker, "TESTTEST %d", inBuyZone);
-	
 	if (!m_dmdamage[victim])
 		return;
 
@@ -1069,6 +1089,24 @@ public SDK_SpawnPost(entity)
 			RemoveEdict(entity);
 	}
 }
+
+public SDK_TouchPost(zoneEntity, client)
+{
+	if (!dm_GameRun () || g_dmMode == MODE_DM || !g_tdmBuyZoneAddHpStart)
+		return;
+
+	if (!IsClientInGame(client) || !IsPlayerAlive (client))
+		return;
+	
+	if (!m_inBuyZone[client])
+		PrintToChat(client, "You in the buy zone");
+	
+	m_inBuyZone[client] = true;
+	m_inBuyZoneCheckTime[client] = GetGameTime () + 1.0;
+	
+	if (m_inBuyZoneAddHPTime[client] == -1.0)
+		m_inBuyZoneAddHPTime[client] = GetGameTime () + g_tdmBuyZoneAddHpTime + 0.1;
+}
 // ====================
 
 public PlayerDataReset(id)
@@ -1084,6 +1122,9 @@ public PlayerDataReset(id)
 	m_godMode[id] = false;
 	m_dmdamage[id] = false;
 	m_playerKill[id] = 0;
+	m_inBuyZone[id] = false;
+	m_inBuyZoneAddHPTime[id] = -1.0;
+	m_inBuyZoneCheckTime[id] = -1.0;
 	
 	m_showMsgTime[id] = GetGameTime();
 }
