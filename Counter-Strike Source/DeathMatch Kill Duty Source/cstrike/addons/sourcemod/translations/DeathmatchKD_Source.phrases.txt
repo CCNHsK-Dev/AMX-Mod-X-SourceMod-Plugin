@@ -89,6 +89,22 @@
 	{
 		"en"			"[DM:KD-S] Sec Weapon Menu"
 	}
+	
+	"WILL_ADD_HP"
+	{
+		"en"			"[DM: KD-S] you in the buy zone, will add hp!"
+	}
+	
+	"WILL_NOT_ADD_HP"
+	{
+		"en"			"[DM: KD-S] you exit buy zone.."
+	}
+	
+	"ADD_HP_IN_BZN"
+	{
+		"#format"		"{1:.0f},{2:d}"
+		"en"			"[DM: KD-S] you in the buy zone {1} 's, add {2} hp!!"
+	}
 
 	"Have not Spawn Origin In DM"
 	{

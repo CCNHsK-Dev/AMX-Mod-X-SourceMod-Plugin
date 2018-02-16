@@ -80,6 +80,21 @@
 		"zho"			"[DM: KD-S] 選擇你的副武器"
 	}
 
+	"WILL_ADD_HP"
+	{
+		"zho"			"[DM: KD-S] 你在購買區, 張會補充血量!"
+	}
+	
+	"WILL_NOT_ADD_HP"
+	{
+		"zho"			"[DM: KD-S] 你離開購買區..."
+	}
+	
+	"ADD_HP_IN_BZN"
+	{
+		"zho"			"[DM: KD-S] 你在購買區 {1} 秒, 補充 {2} 血量!!"
+	}
+	
 	"Have not Spawn Origin In DM"
 	{
 		"zho"			"*** [DM ERROR] 本地圖沒有重生點, 因此遊戲模式改為團隊死鬥  ***"

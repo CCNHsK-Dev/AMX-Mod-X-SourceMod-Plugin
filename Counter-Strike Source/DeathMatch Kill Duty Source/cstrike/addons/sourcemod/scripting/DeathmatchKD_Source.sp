@@ -18,7 +18,7 @@ public Plugin:myinfo =
 	name = "DeathMatch: Kill Duty Source",
 	author = "HsK-Dev Blog By CCN",
 	description = "Deathmatch: Kill Duty Source",
-	version = "2.0.0.33",
+	version = "2.0.0.35",
 	url = "http://ccnhsk-dev.blogspot.com/"
 };
 
@@ -75,6 +75,7 @@ new g_priweaponID[30], g_secweaponID[30]; // Weapon Menu weapon id
 new String:g_priweaponName[30][512], String:g_secweaponName[30][512]; // Weapon Menu weapon name
 
 // Player vars
+new bool:m_inGamePlayer[MAXPLAYERS + 1]; // The Player in the game
 Menu m_menu[MAXPLAYERS + 1];  // For Player Menu
 new m_menuType[MAXPLAYERS + 1]; // For Player Menu
 new Float:m_showMsgTime[MAXPLAYERS + 1]; // Show Msg Time
@@ -94,8 +95,6 @@ public OnPluginStart()
 {
 	LoadTranslations("DeathmatchKD_Source.phrases");
 
-	RegConsoleCmd("say", Command_DmSet);
-
 	HookEvent("round_start", Event_Round_Start, EventHookMode_Post);
 	HookEvent("round_freeze_end",Event_RoundFreezeEnd);
 	
@@ -104,11 +103,12 @@ public OnPluginStart()
 
 	AddCommandListener(Command_BlockGameBuyMenu, "buyequip");
 	AddCommandListener(Command_BlockGameBuyMenu, "buymenu");
-	
+
 	AddCommandListener(Command_Kill, "kill");
 	AddCommandListener(Command_ChangeTeam, "autoteam");
 	AddCommandListener(Command_ChangeTeam, "jointeam");
 	AddCommandListener(Command_ChangeTeam, "chooseteam");
+	AddCommandListener(Command_DmSetMenu, "say");
 	
 	g_iAccount = FindSendPropInfo("CCSPlayer", "m_iAccount");
 }
@@ -404,30 +404,20 @@ public OnClientDisconnect(client)
 // =======================
 
 // DM Set Menu============
-public Action:Command_DmSet(client, args)
+public Action:Command_DmSetMenu(client, const String:command[], args)
 {
-	if (!client)
-		client++;
-
-	if (!GetUserAdmin(client))
+	if (!client || !GetUserAdmin(client))
 		return Plugin_Continue;
 
-	decl String:text[192];
-	if (GetCmdArgString(text, sizeof(text)) < 1)  return Plugin_Continue;
-
-	new startidx;
-	if (text[strlen(text)-1] == '"') {
-		text[strlen(text)-1] = '\0';
-		startidx = 1;
-	}
-
-	decl String:message[8];
-	BreakString(text[startidx], message, sizeof(message));
-	
-	if (strcmp(message, "/dm_set", false) == 0 || strcmp(message, "!dm_set", false) == 0) {
+	char message[128];
+	GetCmdArgString(message, sizeof(message));
+	ReplaceString(message, sizeof(message), "\"", "");
+	if(StrEqual(message, "/dm_set") || StrEqual(message, "!dm_set"))
+	{
 		Dm_Game_Set_Menu(client);
+		return Plugin_Handled;
 	}
-	
+		
 	return Plugin_Continue;
 }
 
@@ -457,8 +447,8 @@ public Action:Command_ChangeTeam(client, const String:command[], args)
 	if (!client || !IsClientConnected(client))
 		return Plugin_Continue;
 
-	if (GetClientTeam(client) == CS_TEAM_T || GetClientTeam(client) == CS_TEAM_CT)
-		return Plugin_Stop;
+	if (m_inGamePlayer[client] || IsPlayerAlive(client))
+		return Plugin_Handled;
 	
 	new joinTeam;
 	if (GetTeamClientCount(2) > GetTeamClientCount(3))
@@ -490,6 +480,7 @@ public Action:Command_BlockGameBuyMenu(client, const String:command[], args)
 {
 	return Plugin_Handled;
 }
+
 // =======================
 
 
@@ -521,7 +512,9 @@ public Action:Event_RoundFreezeEnd(Handle:event, const String:name[], bool:dontB
 		if (!IsClientConnected(player) || !IsClientInGame(player)) continue;
 
 		ingame_player++;
-		PlayerSpawn(player);
+		
+		if (!m_inGamePlayer[player])
+			PlayerSpawn(player);
 	}
 
 	if (g_maxKillData == 0)
@@ -649,6 +642,19 @@ public OnGameFrame ()
 {
 	new Float:gameTime = GetGameTime();
 	
+	if (!g_dmGameStart)
+	{
+		if (g_freezeTime - gameTime == 4)
+		{
+			for (new player = 1; player <= MAX_NAME_LENGTH; player++)
+			{
+				if (!IsClientConnected(player) || !IsClientInGame(player)) continue;
+				
+				PlayerSpawn(player);
+			}
+		}
+	}
+	
 	if (g_dmGameEnd)
 		dm_changeNextMap (gameTime);
 
@@ -693,6 +699,7 @@ public SDK_PreThink(client)
 			m_spawnTime[client] = -1.0;
 			PlayerSpawn(client);
 		}
+		m_inGamePlayer[client] = true;
 	}
 
 	if (m_godMode[client] && m_godModeTime[client] < gameTime)
@@ -720,6 +727,7 @@ public SDK_PreThink(client)
 	if (isAlive)
 	{
 		SetEntData(client, g_iAccount, 0);
+		m_inGamePlayer[client] = true;
 		
 		m_enforcementSpawnTime[client] = -1.0;
 
@@ -744,14 +752,14 @@ public SDK_PreThink(client)
 				m_inBuyZone[client] = false;
 				m_inBuyZoneCheckTime[client] = -1.0;
 				m_inBuyZoneAddHPTime[client] = -1.0;
-				PrintToChat(client, "You out the buy zone");
+				PrintToChat(client, "%T", "WILL_NOT_ADD_HP", client);
 			}
 			
 			if (!m_inBuyZone[client])
 				m_inBuyZoneAddHPTime[client] = -1.0;
 			else if (m_inBuyZoneAddHPTime[client] != -1.0 && m_inBuyZoneAddHPTime[client] <= gameTime)
 			{
-				PrintToChat(client, "Buy Zone Add HP");
+				PrintToChat(client, "%T", "ADD_HP_IN_BZN", client, g_tdmBuyZoneAddHpTime, g_tdmBuyZoneAddHp);
 				m_inBuyZoneAddHPTime[client] = gameTime + g_tdmBuyZoneAddHpTime + 0.1;
 					
 				new health = GetClientHealth(client) + g_tdmBuyZoneAddHp;
@@ -878,6 +886,7 @@ public SDK_TakeDamagePost(victim, attacker, inflictor, Float:damage, damagetype)
 // Dm Spawn ====================
 public PlayerSpawn(client)
 {
+	m_inGamePlayer[client] = true;
 	Get_Weapon_Menu(client);
 }
 
@@ -1099,7 +1108,7 @@ public SDK_TouchPost(zoneEntity, client)
 		return;
 	
 	if (!m_inBuyZone[client])
-		PrintToChat(client, "You in the buy zone");
+		PrintToChat(client, "%T", "WILL_ADD_HP", client);
 	
 	m_inBuyZone[client] = true;
 	m_inBuyZoneCheckTime[client] = GetGameTime () + 1.0;
@@ -1109,24 +1118,26 @@ public SDK_TouchPost(zoneEntity, client)
 }
 // ====================
 
-public PlayerDataReset(id)
+public PlayerDataReset(client)
 {
-	m_menu[id] = null;
-	m_menuType[id] = 0;
+	m_inGamePlayer[client] = false;
 
-	m_priWeaponID[id] = -1;
-	m_secWeaponID[id] = -1;
-	m_godModeTime[id] = -1.0;
-	m_spawnTime[id] = -1.0;
-	m_enforcementSpawnTime[id] = -1.0;
-	m_godMode[id] = false;
-	m_dmdamage[id] = false;
-	m_playerKill[id] = 0;
-	m_inBuyZone[id] = false;
-	m_inBuyZoneAddHPTime[id] = -1.0;
-	m_inBuyZoneCheckTime[id] = -1.0;
+	m_menu[client] = null;
+	m_menuType[client] = 0;
+
+	m_priWeaponID[client] = -1;
+	m_secWeaponID[client] = -1;
+	m_godModeTime[client] = -1.0;
+	m_spawnTime[client] = -1.0;
+	m_enforcementSpawnTime[client] = -1.0;
+	m_godMode[client] = false;
+	m_dmdamage[client] = false;
+	m_playerKill[client] = 0;
+	m_inBuyZone[client] = false;
+	m_inBuyZoneAddHPTime[client] = -1.0;
+	m_inBuyZoneCheckTime[client] = -1.0;
 	
-	m_showMsgTime[id] = GetGameTime();
+	m_showMsgTime[client] = GetGameTime();
 }
 
 public GameDataReset()
