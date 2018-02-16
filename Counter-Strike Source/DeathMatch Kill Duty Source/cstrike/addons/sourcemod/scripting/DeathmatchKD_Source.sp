@@ -18,7 +18,7 @@ public Plugin:myinfo =
 	name = "DeathMatch: Kill Duty Source",
 	author = "HsK-Dev Blog By CCN",
 	description = "Deathmatch: Kill Duty Source",
-	version = "2.0.0.35",
+	version = "2.0.0.36",
 	url = "http://ccnhsk-dev.blogspot.com/"
 };
 
@@ -190,7 +190,7 @@ public DMBaseSetting()
 	Format(g_priweaponName[2], sizeof(g_priweaponName), "AK47/CV47");
 	
 	g_secweaponNum = 3;
-	g_secweaponID[0] = get_user_weapon_id("weapon_glock18");
+	g_secweaponID[0] = get_user_weapon_id("weapon_glock");
 	Format(g_secweaponName[0], sizeof(g_secweaponName), "Glock 18");
 	g_secweaponID[1] = get_user_weapon_id("weapon_usp");
 	Format(g_secweaponName[1], sizeof(g_secweaponName), "USP");
@@ -519,8 +519,10 @@ public Action:Event_RoundFreezeEnd(Handle:event, const String:name[], bool:dontB
 
 	if (g_maxKillData == 0)
 	{
-		if (g_dmMode == MODE_DM) g_maxKill = ingame_player * 2;
-		else g_maxKill = ingame_player * 4;
+		if (g_dmMode == MODE_TDM)
+			g_maxKill = GetRandomInt (5, 7) * ingame_player;
+		else
+			g_maxKill = GetRandomInt (2, 3) * (ingame_player - 1);
 	}
 	else
 		g_maxKill = g_maxKillData;
