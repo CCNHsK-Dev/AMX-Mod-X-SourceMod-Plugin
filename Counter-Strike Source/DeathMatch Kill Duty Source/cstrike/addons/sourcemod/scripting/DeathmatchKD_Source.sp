@@ -18,7 +18,7 @@ public Plugin:myinfo =
 	name = "DeathMatch: Kill Duty Source",
 	author = "HsK-Dev Blog By CCN",
 	description = "Deathmatch: Kill Duty Source",
-	version = "2.0.0.36",
+	version = "2.0.0.38",
 	url = "http://ccnhsk-dev.blogspot.com/"
 };
 
@@ -84,6 +84,7 @@ new bool:m_godMode[MAXPLAYERS + 1], Float:m_godModeTime[MAXPLAYERS + 1]; // Is P
 new Float:m_spawnTime[MAXPLAYERS + 1]; // Player Spawn Time
 new Float:m_enforcementSpawnTime[MAXPLAYERS + 1]; // Player Enforcement Spawn Time
 new bool:m_dmdamage[MAXPLAYERS + 1]; // DM Damage
+new bool:m_wSilencerMode[MAXPLAYERS + 1][2]; // M4A1/USP Silencer Mode
 new m_playerKill[MAXPLAYERS + 1]; // Player Kill [pdm]
 new bool:m_inBuyZone[MAXPLAYERS + 1], Float:m_inBuyZoneCheckTime[MAXPLAYERS + 1]; // TDM Mode BuyZone Add HP
 new Float:m_inBuyZoneAddHPTime[MAXPLAYERS + 1];
@@ -747,6 +748,27 @@ public SDK_PreThink(client)
 			}
 		}
 		
+		new ActiveWeapon = GetEntPropEnt(client, Prop_Send, "m_hActiveWeapon");
+		if (IsValidEdict(ActiveWeapon))
+		{
+			decl String:WeaponName[30];
+			GetEdictClassname(ActiveWeapon, WeaponName, sizeof(WeaponName));
+			if (StrEqual("weapon_usp", WeaponName, false))
+			{
+				if (GetEntProp(ActiveWeapon, Prop_Send, "m_bSilencerOn"))
+					m_wSilencerMode[client][0] = true;
+				else
+					m_wSilencerMode[client][0] = false;
+			}
+			else if (StrEqual("weapon_m4a1", WeaponName, false))
+			{
+				if (GetEntProp(ActiveWeapon, Prop_Send, "m_bSilencerOn"))
+					m_wSilencerMode[client][1] = true;
+				else
+					m_wSilencerMode[client][1] = false;
+			}
+		}
+		
 		if (g_dmMode == MODE_TDM && g_tdmBuyZoneAddHpStart)
 		{
 			if (m_inBuyZoneCheckTime[client] != -1.0 && m_inBuyZoneCheckTime[client] <= gameTime)
@@ -1032,19 +1054,36 @@ public Player_Spawn(client)
 		RemoveEdict(weaponEntity);
 	}
 
-	GivePlayerItem(client, "item_assaultsuit", 0);
+	GivePlayerItem(client, "item_assaultsuit");
 
 	m_godModeTime[client] = GetGameTime() + g_spawnGodTime;
 
+	new weaponEntityId[2] = {-1, -1};
 	if (m_secWeaponID[client] >= 0)
-		GivePlayerItem(client, WEAPON_CLASSNAME[g_secweaponID[m_secWeaponID[client]]]);
+		weaponEntityId[0] = GivePlayerItem(client, WEAPON_CLASSNAME[g_secweaponID[m_secWeaponID[client]]]);
 		
 	if (m_priWeaponID[client] >= 0)
-		GivePlayerItem(client, WEAPON_CLASSNAME[g_priweaponID[m_priWeaponID[client]]]);
+		weaponEntityId[1] = GivePlayerItem(client, WEAPON_CLASSNAME[g_priweaponID[m_priWeaponID[client]]]);
 
 	if (g_spawnGetGrenade[0]) GivePlayerItem(client, "weapon_hegrenade");
 	if (g_spawnGetGrenade[1]) GivePlayerItem(client, "weapon_flashbang");
 	if (g_spawnGetGrenade[2]) GivePlayerItem(client, "weapon_smokegrenade");
+	
+	for (new i = 0; i < 2; i++)
+	{
+		if (weaponEntityId[i] == -1)
+			continue;
+	
+		decl String:WeaponName[30];
+		GetEdictClassname(weaponEntityId[i], WeaponName, sizeof(WeaponName));
+		if (!StrEqual("weapon_usp", WeaponName, false) && !StrEqual("weapon_m4a1", WeaponName, false))
+			continue;
+			
+		if (!m_wSilencerMode[client][i])
+			continue;
+			
+		SetEntProp(weaponEntityId[i],Prop_Send,"m_bSilencerOn", 1);
+	}
 }
 // ===============================
 
@@ -1138,6 +1177,8 @@ public PlayerDataReset(client)
 	m_inBuyZone[client] = false;
 	m_inBuyZoneAddHPTime[client] = -1.0;
 	m_inBuyZoneCheckTime[client] = -1.0;
+	m_wSilencerMode[client][0] = false;
+	m_wSilencerMode[client][1] = false;
 	
 	m_showMsgTime[client] = GetGameTime();
 }
