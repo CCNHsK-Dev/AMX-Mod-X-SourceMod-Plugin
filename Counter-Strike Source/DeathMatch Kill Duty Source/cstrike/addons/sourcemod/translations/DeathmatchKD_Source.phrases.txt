@@ -24,10 +24,16 @@
 		"en"			"CT{1} | {2}TR"
 	}
 
-	"TDM_WIN"
+	"TDM_TR_WIN"
 	{
-		"#format"		"{1:s},{2:s}"
-		"en"			"Win Team:{1} | Next Map:{2}"
+		"#format"		"{1:s}"
+		"en"			"!!TR WiN!! \n Next Map is [{1}]"
+	}
+	
+	"TDM_CT_WIN"
+	{
+		"#format"		"{1:s}"
+		"en"			"!!CT WiN!! \n Next Map is [{1}]"
 	}
 	
 	"COUNTDOWN_MSG"

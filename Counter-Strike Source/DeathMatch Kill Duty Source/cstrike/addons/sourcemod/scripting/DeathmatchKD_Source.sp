@@ -1,7 +1,7 @@
 
 /* 
 			DeathMatch: Kill Duty Source - Upgrade 1
-				19/2/2018 (Version: 2.0)
+				23/2/2018 (Version: 2.0)
 			
 					HsK-Dev Blog By CCN
 			
@@ -18,7 +18,7 @@ public Plugin:myinfo =
 	name = "DeathMatch: Kill Duty Source",
 	author = "HsK-Dev Blog By CCN",
 	description = "Deathmatch: Kill Duty Source",
-	version = "2.0.0.38",
+	version = "2.0.0.40",
 	url = "http://ccnhsk-dev.blogspot.com/"
 };
 
@@ -550,15 +550,24 @@ public dm_roundEnd ()
 
 	g_dmGameEnd = true;
 	
+	new String:playSound[64];
 	if (g_dmMode == MODE_TDM)
 	{
 		if (g_teamCTKill > g_teamTRKill)
-			EmitSoundToAll ("radio/ctwin.wav");
+			Format(playSound, sizeof(playSound), "radio/ctwin.wav");
 		else
-			EmitSoundToAll ("radio/terwin.wav");
+			Format(playSound, sizeof(playSound), "radio/terwin.wav");
 	}
 	else
-		EmitSoundToAll ("radio/terwin.wav");
+		Format(playSound, sizeof(playSound), "radio/terwin.wav");
+		
+	for (new player = 1; player <= MAX_NAME_LENGTH; player++)
+	{
+		if (!IsClientConnected(player) || IsFakeClient (player))
+			continue;
+			
+		EmitSoundToClient(player, playSound, SOUND_FROM_PLAYER, SNDCHAN_AUTO, SNDLEVEL_GUNFIRE);
+	}
 }
 
 public dm_changeNextMap (Float:gameTime)
@@ -607,8 +616,12 @@ public dm_showMsg (client, Float:gameTime)
 		if (g_dmMode == MODE_DM)
 			len += Format(Text[len], sizeof(Text)-len, "%T", "DM_WIN", client, g_topKiller, g_mapsName[g_nextMapId]);
 		else
-			len += Format(Text[len], sizeof(Text)-len, "%T", "TDM_WIN", client,
-			(g_teamTRKill >= g_teamCTKill) ? "TR" : "CT", g_mapsName[g_nextMapId]);
+		{
+			if (g_teamTRKill >= g_teamCTKill)
+				len += Format(Text[len], sizeof(Text)-len, "%T", "TDM_TR_WIN", client, g_mapsName[g_nextMapId]);
+			else
+				len += Format(Text[len], sizeof(Text)-len, "%T", "TDM_CT_WIN", client, g_mapsName[g_nextMapId]);
+		}
 	}
 	
 	if (dm_GameRun ())
@@ -1146,6 +1159,11 @@ public SDK_TouchPost(zoneEntity, client)
 		return;
 
 	if (!IsClientInGame(client) || !IsPlayerAlive (client))
+		return;
+	
+	new buyZoneTeam = GetEntProp(zoneEntity, Prop_Data, "m_iTeamNum");
+	new playerTeam = GetClientTeam(client);
+	if (buyZoneTeam != playerTeam)
 		return;
 	
 	if (!m_inBuyZone[client])
