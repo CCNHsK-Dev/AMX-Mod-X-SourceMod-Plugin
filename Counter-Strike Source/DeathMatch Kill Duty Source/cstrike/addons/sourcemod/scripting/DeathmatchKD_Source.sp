@@ -1,7 +1,7 @@
 
 /* 
 			DeathMatch: Kill Duty Source - Upgrade 1
-				23/2/2018 (Version: 2.0)
+				23/2/2018 (Version: 3.0.0)
 			
 					HsK-Dev Blog By CCN
 			
@@ -18,7 +18,7 @@ public Plugin:myinfo =
 	name = "DeathMatch: Kill Duty Source",
 	author = "HsK-Dev Blog By CCN",
 	description = "Deathmatch: Kill Duty Source",
-	version = "2.0.0.40",
+	version = "3.0.0.40",
 	url = "http://ccnhsk-dev.blogspot.com/"
 };
 
@@ -660,7 +660,7 @@ public OnGameFrame ()
 	
 	if (!g_dmGameStart)
 	{
-		if (g_freezeTime - gameTime == 4)
+		if (g_secondThinkTime <= gameTime && RoundToZero(g_freezeTime) - RoundToZero(gameTime) == 4)
 		{
 			for (new player = 1; player <= MAX_NAME_LENGTH; player++)
 			{

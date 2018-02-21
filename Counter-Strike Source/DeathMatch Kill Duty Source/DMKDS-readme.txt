@@ -9,9 +9,21 @@ Need:
  - SourceMod 
 _____________________________
 DeathMatch: Kill Duty Source - Upgrade 1
-Version: 2.0.0 (xx/3/2017)
- - 
- - 
+Version: 3.0.0 (23/2/2018)
+ - Support Lastly SourceMod
+ - Remove Drop Weapon improve
+ - Change Maps improve
+ - Hud Message improve
+ - Game Menu improve
+ - Bot Choose Weapon improve
+ - Now Can Save M4A1/USP Silenced
+ - Add Round Time
+ - Max Kill Auto Setting improve
+ - Support BuyZone Add HP
+ - Support DM Kill Enemy Add HP
+ - New Player Connect improve
+ - More Damage bug fixed
+ - More Base improve and fixed
 
 _____________________________
 DeathMatch: Kill Duty Source
