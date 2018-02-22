@@ -7,13 +7,14 @@ DeathMatch Plug-in for Counter-Strike: Source
 Need:
  - Counter-Strike: Source
  - SourceMod 
+ 
 _____________________________
 DeathMatch: Kill Duty Source - Upgrade 1
 Version: 3.0.0 (23/2/2018)
  - Support Lastly SourceMod
  - Remove Drop Weapon improve
  - Change Maps improve
- - Hud Message improve
+ - Game Message improve
  - Game Menu improve
  - Bot Choose Weapon improve
  - Now Can Save M4A1/USP Silenced

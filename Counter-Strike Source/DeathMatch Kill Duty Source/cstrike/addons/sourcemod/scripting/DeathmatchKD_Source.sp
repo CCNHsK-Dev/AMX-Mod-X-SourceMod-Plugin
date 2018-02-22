@@ -18,7 +18,7 @@ public Plugin:myinfo =
 	name = "DeathMatch: Kill Duty Source",
 	author = "HsK-Dev Blog By CCN",
 	description = "Deathmatch: Kill Duty Source",
-	version = "3.0.0.40",
+	version = "3.0.0.41",
 	url = "http://ccnhsk-dev.blogspot.com/"
 };
 
@@ -796,14 +796,17 @@ public SDK_PreThink(client)
 				m_inBuyZoneAddHPTime[client] = -1.0;
 			else if (m_inBuyZoneAddHPTime[client] != -1.0 && m_inBuyZoneAddHPTime[client] <= gameTime)
 			{
-				PrintToChat(client, "%T", "ADD_HP_IN_BZN", client, g_tdmBuyZoneAddHpTime, g_tdmBuyZoneAddHp);
 				m_inBuyZoneAddHPTime[client] = gameTime + g_tdmBuyZoneAddHpTime + 0.1;
-					
-				new health = GetClientHealth(client) + g_tdmBuyZoneAddHp;
-				if (health > 100)
-					SetEntityHealth(client, 100);
-				else
-					SetEntityHealth(client, health);
+			
+				new addHealth = g_tdmBuyZoneAddHp;
+				if (GetClientHealth(client) + addHealth > 100)
+					addHealth = 100 - GetClientHealth(client);
+			
+				if (addHealth > 0)
+				{
+					PrintToChat(client, "%T", "ADD_HP_IN_BZN", client, g_tdmBuyZoneAddHpTime, addHealth);
+					SetEntityHealth(client, GetClientHealth(client) + addHealth);
+				}
 			}
 		}
 	}

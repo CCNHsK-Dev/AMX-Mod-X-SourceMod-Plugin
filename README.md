@@ -9,7 +9,7 @@ AMX Mod X Plug-in:
 SourceMod Plug-in:
 
  - Counter-Strike: Source
-  - DeathMatch: Kill Duty Source  - v1.0
+  - DeathMatch: Kill Duty Source  - v3.0.0
   - Download: https://ccnhsk-dev.blogspot.com/search/label/DMKD-S%20Download
 
 
