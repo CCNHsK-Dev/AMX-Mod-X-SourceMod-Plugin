@@ -14,13 +14,17 @@ Other Back-UP:
 
 Lead 4 Dead
   - High Damage Player is Killer [9/7/2012]
+  - other more
 
 Counter-Strike
+  - Szkp80 Server Plugin [9/7/2010]
   - Player model index debug [28/7/2010]
   - Sex Roles [4/8/2010]
   - Weapon Sound Black and Reset [4/4/2011]
+  - Zombie Plague ReMiX [17/4/2011][Drop Project]
   - Zbot Strengthen [18/5/2011]
   - Knife attack distance [20/9/2011]
   - Blood Color   [4/11/2011]
+  - other more
 
 Download or more pls visit: http://ccnhsk-dev.blogspot.com/
