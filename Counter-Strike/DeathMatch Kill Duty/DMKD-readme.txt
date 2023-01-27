@@ -9,6 +9,12 @@ Need:
  - AMX Mod X
 
 _____________________________
+DeathMatch: Kill Duty 3.1.1
+Version: 3.1.1 (28/1/2023)
+ - Fixed DM Mode Less Spawn Point Stuck
+ - Fixed Fall or other not Attacker Dead, Player cannot Spawn
+
+_____________________________
 DeathMatch: Kill Duty - Upgrade 2
 Version: 3.1.0 (22/3/2017)
  - Hud Message improve

@@ -1,7 +1,7 @@
 
 /* 
-			DeathMatch: Kill Duty - Upgrade 2
-				22/3/2017 (Version: 3.1.0)
+			DeathMatch: Kill Duty 3.1.1
+				28/1/2023 (Version: 3.1.1)
 			
 					HsK-Dev Blog By CCN
 			
@@ -15,7 +15,7 @@
 #include <hamsandwich>
 
 #define PLUGIN	"Deathmatch: Kill Duty"
-#define VERSION	"3.1.0.0"
+#define VERSION	"3.1.1.0"
 #define AUTHOR	"HsK-Dev Blog By CCN"
 
 new const MAX_BPAMMO[] = { -1, 52, -1, 90, 1, 32, 1, 100, 90, 1, 120, 100, 100, 90, 90, 90, 100, 120,
@@ -727,7 +727,6 @@ public fw_PlayerKilled(victim, attacker, shouldgib)
 	
 	static weapon, hitzone;
 	get_user_attacker(victim, weapon, hitzone);
-	weapon = get_user_weapon(attacker);
 
 	dm_DeathAction (victim, hitzone, gameTime);
 
@@ -737,6 +736,8 @@ public fw_PlayerKilled(victim, attacker, shouldgib)
 		SendDeathMsg(attacker, victim, "worldspawn", 1);
 		return HAM_SUPERCEDE;
 	}
+	
+	weapon = get_user_weapon(attacker);
 
 	set_pev(attacker, pev_frags, float(pev(attacker, pev_frags)+1));
 	SendDeathMsg(attacker, victim, weapon_msgname[weapon], (hitzone == 1) ? 1 : 0);
@@ -1418,11 +1419,15 @@ public dm_setSpawnPoint (id)
 	if (g_dmMode != MODE_DM || !is_user_alive(id))
 		return;
 	
-	new spawnPoint = -1;
+	new spawnPoint = -1, checkTime = 0;
 	static hull;
 	hull = (pev(id, pev_flags) & FL_DUCKING) ? HULL_HEAD : HULL_HUMAN
 	while (spawnPoint == -1)
 	{
+		if (checkTime > g_spawnCount)
+			break;
+		
+		checkTime++;
 		spawnPoint = random_num(0, g_spawnCount - 1);
 		
 		if (!is_hull_vacant(g_spawnPoint[spawnPoint], hull))
@@ -1444,10 +1449,13 @@ public dm_setSpawnPoint (id)
 		}
 	}
 
-	fm_set_user_origin (id, g_spawnPoint[spawnPoint]);
-	
-	if (g_spawnAngles[spawnPoint][0] != 0.0 && g_spawnAngles[spawnPoint][1] != 0.0)
-		set_pev(id,pev_angles,g_spawnAngles[spawnPoint]);
+	if (spawnPoint != -1)
+	{
+		fm_set_user_origin (id, g_spawnPoint[spawnPoint]);
+		
+		if (g_spawnAngles[spawnPoint][0] != 0.0 && g_spawnAngles[spawnPoint][1] != 0.0)
+			set_pev(id,pev_angles,g_spawnAngles[spawnPoint]);
+	}
 }
 
 public dm_DeathAction (id, hitzone, Float: gameTime)
