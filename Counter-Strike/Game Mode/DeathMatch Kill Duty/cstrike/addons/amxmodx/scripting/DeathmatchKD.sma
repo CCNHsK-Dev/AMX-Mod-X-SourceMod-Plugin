@@ -15,7 +15,7 @@
 #include <hamsandwich>
 
 #define PLUGIN	"Deathmatch: Kill Duty"
-#define VERSION	"3.1.1.0"
+#define VERSION	"3.1.1.1"
 #define AUTHOR	"HsK-Dev Blog By CCN"
 
 new const MAX_BPAMMO[] = { -1, 52, -1, 90, 1, 32, 1, 100, 90, 1, 120, 100, 100, 90, 90, 90, 100, 120,
@@ -102,8 +102,9 @@ new bool:g_unlimitAmmo; // Unlimited Ammo(Magazine)
 new bool:g_giveGrenade[3]; // Give Grenade
 new g_startTimeData, g_startTime; // Game Start Time (Freeze Time)
 new g_fwSpawn; // Spawn and forward handles
+
 new bool:g_BZAddHp, Float:g_BZAddHpTime, g_BZAddHpAmounT; // Buyzone Add hp setting
-new g_dmModeKillerAddHP; // Kill Enemy Add HP (DM Mode)
+new g_dmModeKillerAddHP, g_dmModeKillerAddHPHS; // Kill Enemy Add HP (DM Mode)
 
 // Weapons Menu
 new g_priweapon, g_secweapon, g_priweaponID[30], g_secweaponID[30], 
@@ -319,6 +320,7 @@ LoadDMSettingFile()
 				else if (equal(key, "Buyzone Add HP Time")) g_BZAddHpTime = str_to_float(value);
 				else if (equal(key, "Buyzone Add HP Amount")) g_BZAddHpAmounT = str_to_num(value);
 				else if (equal(key, "Kill Enemy Add HP")) g_dmModeKillerAddHP = str_to_num(value);
+				else if (equal(key, "Kill Enemy to HeadShot Add HP")) g_dmModeKillerAddHPHS = str_to_num(value);
 			}
 			case 2:
 			{
@@ -528,7 +530,7 @@ public DM_BaseGameSetting()
 
 //==========================
 
-// Block map [c4...ho...] ==========
+// Block Map Mission ==========
 public fw_Spawn(entity)
 {
 	if (!pev_valid(entity))
@@ -766,8 +768,12 @@ public fw_PlayerKilled(victim, attacker, shouldgib)
 	}
 	else
 	{
-		if (g_dmModeKillerAddHP > 0)
-			fm_set_user_health(attacker, min(fm_get_user_health(attacker) + g_dmModeKillerAddHP, 100));
+		new AddHp = g_dmModeKillerAddHP;
+		if (hitzone == HIT_HEAD && g_dmModeKillerAddHPHS > 0)
+			AddHp = g_dmModeKillerAddHPHS;
+	
+		if (AddHp > 0)
+			fm_set_user_health(attacker, min(fm_get_user_health(attacker) + AddHp, 100));
 
 		if (g_MaxKill > 0 && m_player_kill[attacker] >= g_MaxKill)
 		{
