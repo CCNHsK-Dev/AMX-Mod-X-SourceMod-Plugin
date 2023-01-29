@@ -15,7 +15,7 @@
 #include <hamsandwich>
 
 #define PLUGIN	"Deathmatch: Kill Duty"
-#define VERSION	"3.1.1.1"
+#define VERSION	"3.1.1.2"
 #define AUTHOR	"HsK-Dev Blog By CCN"
 
 new const MAX_BPAMMO[] = { -1, 52, -1, 90, 1, 32, 1, 100, 90, 1, 120, 100, 100, 90, 90, 90, 100, 120,
@@ -229,6 +229,7 @@ LoadDMKDSetting ()
 	g_BZAddHpTime = 5.0;
 	g_BZAddHpAmounT = 10;
 	g_dmModeKillerAddHP = 20;
+	g_dmModeKillerAddHPHS = 30;
 	g_deadSeePlayerTime = 4.0;
 	
 	LoadDMSettingFile();
@@ -298,6 +299,7 @@ LoadDMSettingFile()
 				else if (equal(key, "Player Respawn Time")) g_spawnTime = str_to_float(value);
 				else if (equal(key, "Player Protect Time")) g_spawnGodTime = str_to_float(value);
 				else if (equal(key, "Player Enforcement Respawn Time")) g_spawnMaxTime = str_to_float(value);
+				else if (equal(key, "Player Dead Check Attacker Time")) g_deadSeePlayerTime = str_to_float(value);
 				else if (equal(key, "Remove Dropped Weapon Time")) g_weaponRemoveTime = str_to_float(value);
 				else if (equal(key, "Block Player Suicide")) g_blockSuicide = str_to_bool(value);
 				else if (equal(key, "Unlimited Ammo")) g_unlimitAmmo = str_to_bool(value);
@@ -718,7 +720,7 @@ public fw_PlayerKilled(victim, attacker, shouldgib)
 	m_showHudMsgTime[victim] = gameTime;
 	
 	m_deadSeePlayer[victim] = attacker;
-	m_deadSeePlayerTime[victim][0] = gameTime + 1.2;
+	m_deadSeePlayerTime[victim][0] = gameTime + 0.7;
 	m_deadSeePlayerTime[victim][1] = gameTime + g_deadSeePlayerTime;
 	m_deadSeePlayerTime[victim][2] = gameTime + 0.2;
 	
