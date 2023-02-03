@@ -15,7 +15,7 @@
 #include <hamsandwich>
 
 #define PLUGIN	"Deathmatch: Kill Duty"
-#define VERSION	"3.1.1.2"
+#define VERSION	"3.1.1.3"
 #define AUTHOR	"HsK-Dev Blog By CCN"
 
 new const MAX_BPAMMO[] = { -1, 52, -1, 90, 1, 32, 1, 100, 90, 1, 120, 100, 100, 90, 90, 90, 100, 120,
@@ -104,7 +104,7 @@ new g_startTimeData, g_startTime; // Game Start Time (Freeze Time)
 new g_fwSpawn; // Spawn and forward handles
 
 new bool:g_BZAddHp, Float:g_BZAddHpTime, g_BZAddHpAmounT; // Buyzone Add hp setting
-new g_dmModeKillerAddHP, g_dmModeKillerAddHPHS; // Kill Enemy Add HP (DM Mode)
+new g_dmModeKillerAddHP, g_dmModeKillerAddHPHS, g_dmModeKillerAddHPKN; // Kill Enemy Add HP (DM Mode)
 
 // Weapons Menu
 new g_priweapon, g_secweapon, g_priweaponID[30], g_secweaponID[30], 
@@ -230,6 +230,7 @@ LoadDMKDSetting ()
 	g_BZAddHpAmounT = 10;
 	g_dmModeKillerAddHP = 20;
 	g_dmModeKillerAddHPHS = 30;
+	g_dmModeKillerAddHPKN = 100;
 	g_deadSeePlayerTime = 4.0;
 	
 	LoadDMSettingFile();
@@ -295,7 +296,13 @@ LoadDMSettingFile()
 				trim(key);
 				trim(value);
 
-				if (equal(key, "DM MoD")) g_dmMode = str_to_num(value);
+				if (equal(key, "DM MoD"))
+				{
+					g_dmMode = str_to_num(value);
+					
+					if (g_dmMode != MODE_DM && g_dmMode != MODE_TDM)
+						g_dmMode = random_num (0, 1);
+				}
 				else if (equal(key, "Player Respawn Time")) g_spawnTime = str_to_float(value);
 				else if (equal(key, "Player Protect Time")) g_spawnGodTime = str_to_float(value);
 				else if (equal(key, "Player Enforcement Respawn Time")) g_spawnMaxTime = str_to_float(value);
@@ -323,6 +330,7 @@ LoadDMSettingFile()
 				else if (equal(key, "Buyzone Add HP Amount")) g_BZAddHpAmounT = str_to_num(value);
 				else if (equal(key, "Kill Enemy Add HP")) g_dmModeKillerAddHP = str_to_num(value);
 				else if (equal(key, "Kill Enemy to HeadShot Add HP")) g_dmModeKillerAddHPHS = str_to_num(value);
+				else if (equal(key, "Kill Enemy from Knife Add HP")) g_dmModeKillerAddHPKN = str_to_num(value);
 			}
 			case 2:
 			{
@@ -623,7 +631,7 @@ public logevent_round_start()
 // Hud Msg ==================
 public dm_showHudMsg(id)
 {		
-	if (dm_user_tbot (id))
+	if (is_user_bot (id))
 		return;
 		
 	new hudMsg[256], msgPart;
@@ -770,8 +778,12 @@ public fw_PlayerKilled(victim, attacker, shouldgib)
 	}
 	else
 	{
+		client_cmd(attacker, "spk ^"events/enemy_died.wav^"");
+	
 		new AddHp = g_dmModeKillerAddHP;
-		if (hitzone == HIT_HEAD && g_dmModeKillerAddHPHS > 0)
+		if (weapon == CSW_KNIFE && g_dmModeKillerAddHPKN > 0)
+			AddHp = g_dmModeKillerAddHPKN;
+		else if (hitzone == HIT_HEAD && g_dmModeKillerAddHPHS > 0)
 			AddHp = g_dmModeKillerAddHPHS;
 	
 		if (AddHp > 0)
@@ -1026,7 +1038,7 @@ public fw_ClientKill()
 
 public fw_UpdateClientData(id, sendweapons, cd_handle)
 {
-	if (is_user_alive(id) || dm_user_tbot (id))
+	if (is_user_alive(id) || is_user_bot(id))
 		return FMRES_IGNORED;
 
 	new Float:gameTime = get_gametime ();
@@ -1053,7 +1065,7 @@ public dm_menu_weap(id)
 	if (fm_get_user_team(id) != 1 && fm_get_user_team(id) != 2)
 		return;
 
-	if (dm_user_tbot(id))
+	if (is_user_bot(id))
 	{
 		dm_menu_pri_weap(id);
 		return;
@@ -1103,7 +1115,7 @@ public dm_menu_pri_weap(id)
 	if (fm_get_user_team(id) != 1 && fm_get_user_team(id) != 2)
 		return;
 
-	if (dm_user_tbot(id))
+	if (is_user_bot(id))
 	{
 		new random, weaponid = -1;
 		random = random_num(0, 5);
@@ -1207,7 +1219,7 @@ public dm_menu_sec_weap(id)
 {
 	if (fm_get_user_team(id) != 1 && fm_get_user_team(id) != 2) return;
 	
-	if (dm_user_tbot(id))
+	if (is_user_bot(id))
 	{
 		new random, weaponid;
 		random = random_num(0, 5);
@@ -1474,9 +1486,20 @@ public dm_DeathAction (id, hitzone, Float: gameTime)
 	set_msg_block(get_user_msgid("HideWeapon"), BLOCK_SET);
 	GetWeaponSilen (id);
 	
-	if (fm_get_user_defuse(id))
-		fm_set_user_defuse(id, 0);
-	
+	new defuse = get_pdata_int(id, OFFSET_DEFUSE_PLANT);
+	if (defuse & (1<<16))
+	{
+		defuse &= ~(1<<16) ;
+		set_pdata_int(id, OFFSET_DEFUSE_PLANT, defuse);
+		message_begin(MSG_ONE, get_user_msgid("StatusIcon"), _, id);
+		write_byte(0);
+		write_string("defuser");
+		message_end();
+		
+		set_pev(id, pev_body, 0);
+		
+	}
+
 	drop_weapons(id, 0);
 	fm_strip_user_weapons(id);
 	set_pdata_int(id, 444, get_user_deaths(id) + 1, 5);
@@ -1517,7 +1540,7 @@ public dm_DeathAction (id, hitzone, Float: gameTime)
 
 public GetWeaponSilen (id)
 {
-	if (dm_user_tbot (id))
+	if (is_user_bot (id))
 	{
 		m_weaponSilen[id][0] = (random_num (0, 1)) ? true : false;
 		m_weaponSilen[id][1] = (random_num (0, 1)) ? true : false;
@@ -1593,7 +1616,7 @@ public dm_game_end()
 			copy(sound , charsmax(sound), "radio/ctwin.wav");
 	}
 	else
-		copy(sound , charsmax(sound), "player/betmenushow.wav");
+		copy(sound , charsmax(sound), "events/task_complete.wav");
 
 	client_cmd(0, "spk ^"%s^"", sound);
 	
@@ -1681,7 +1704,7 @@ public client_disconnect (id)
 public client_putinserver(id)
 {
 	playerDataReset (id, false);
-	if (dm_user_tbot(id))
+	if (is_user_bot(id))
 	{
 		m_spawnTime[id] = get_gametime () + 3.0;
 
@@ -1698,8 +1721,8 @@ public playerDataReset (id, newRound)
 		
 		m_pri_weaponid[id] = 0;
 		m_sec_weaponid[id] = 0;
-		m_weaponSilen[id][0] = (dm_user_tbot(id)) ? (random_num (0, 1) ? true : false) : false;
-		m_weaponSilen[id][1] = (dm_user_tbot(id)) ? (random_num (0, 1) ? true : false) : false;
+		m_weaponSilen[id][0] = (is_user_bot(id)) ? (random_num (0, 1) ? true : false) : false;
+		m_weaponSilen[id][1] = (is_user_bot(id)) ? (random_num (0, 1) ? true : false) : false;
 		
 		m_showHudMsgTime[id] = 0.0;
 	}
@@ -1761,7 +1784,7 @@ public event_ShowStatus(id)
 		return;
 		
 	new i = read_data(2);
-	if (!is_user_alive(i) || !is_user_alive(id) || dm_user_tbot (id))
+	if (!is_user_alive(i) || !is_user_alive(id) || is_user_bot(id))
 		return;
 	
 	static text[100], magtext[100];
@@ -1973,8 +1996,6 @@ stock fm_cs_set_user_money(id, value)
 stock fm_set_user_armor(index, armor) 
 {
 	set_pev(index, pev_armorvalue, float(armor));
-	
-	return 1;
 }
 
 stock fm_get_user_health(id)
@@ -1983,32 +2004,16 @@ stock fm_get_user_health(id)
 stock fm_set_user_health(index, health) 
 {
 	health > 0 ? set_pev(index, pev_health, float(health)) : dllfunc(DLLFunc_ClientKill, index);
-	
-	return 1;
-}
-
-stock fm_user_kill(index, flag = 0)
-{
-	if (flag)
-	{
-		new Float:frags;
-		pev(index, pev_frags, frags);
-		set_pev(index, pev_frags, ++frags);
-	}
-	
-	dllfunc(DLLFunc_ClientKill, index);
-	
-	return 1;
 }
 
 stock fm_give_item(index, const item[])
 {
 	if (!equal(item, "weapon_", 7) && !equal(item, "ammo_", 5) && !equal(item, "item_", 5) && !equal(item, "tf_weapon_", 10))
-		return 0;
+		return;
 	
 	new ent = fm_create_entity(item);
 	if (!pev_valid(ent))
-		return 0;
+		return;
 	
 	new Float:origin[3];
 	pev(index, pev_origin, origin);
@@ -2019,11 +2024,9 @@ stock fm_give_item(index, const item[])
 	new save = pev(ent, pev_solid);
 	dllfunc(DLLFunc_Touch, ent, index);
 	if (pev(ent, pev_solid) != save)
-		return ent;
+		return;
 	
 	engfunc(EngFunc_RemoveEntity, ent);
-	
-	return -1;
 }
 
 stock fm_create_entity(const classname[])
@@ -2089,46 +2092,11 @@ stock fm_set_user_bpammo(index, weapon, amount)
 			formatex(invalidMsg,20 + 6,"Invalid weapon id %d",weapon);
 			set_fail_state(invalidMsg);
 			
-			return 0;
+			return;
 		}
 	}
 	
 	set_pdata_int(index,offset,amount);
-	
-	return 1;
-}
-
-stock fm_get_user_bpammo(index, weapon)
-{
-	new offset;
-	
-	switch(weapon)
-	{
-		case CSW_AWP: offset = 377
-		case CSW_SCOUT,CSW_AK47,CSW_G3SG1: offset = 378
-		case CSW_M249: offset = 379
-		case CSW_M4A1,CSW_FAMAS,CSW_AUG,CSW_SG550,CSW_GALI,CSW_SG552: offset = 380
-		case CSW_M3,CSW_XM1014: offset = 381
-		case CSW_USP,CSW_UMP45,CSW_MAC10: offset = 382
-		case CSW_FIVESEVEN,CSW_P90: offset = 383
-		case CSW_DEAGLE: offset = 384
-		case CSW_P228: offset = 385
-		case CSW_GLOCK18,CSW_MP5NAVY,CSW_TMP,CSW_ELITE: offset = 386
-		case CSW_FLASHBANG: offset = 387
-		case CSW_HEGRENADE: offset = 388
-		case CSW_SMOKEGRENADE: offset = 389
-		case CSW_C4: offset = 390
-		default:
-		{
-			new invalidMsg[20 + 7];
-			formatex(invalidMsg,20 + 6,"Invalid weapon id %d",weapon);
-			set_fail_state(invalidMsg);
-			
-			return 0;
-		}
-	}
-	
-	return get_pdata_int(index,offset);
 }
 
 stock fm_find_ent_by_owner(index, const classname[], owner, jghgtype = 0)
@@ -2145,59 +2113,13 @@ stock fm_find_ent_by_owner(index, const classname[], owner, jghgtype = 0)
 }
 
 stock fm_set_user_origin(id, Float:origin[3])
+{
 	engfunc(EngFunc_SetOrigin, id, origin);
-
-stock fm_get_user_defuse(id)
-{
-	if(get_pdata_int(id, OFFSET_DEFUSE_PLANT) & (1<<16) )
-		return 1;
-
-	return 0;
-}
-
-stock fm_set_user_defuse(id, defusekit = 1, r = 0, g = 160, b = 0, icon[] = "defuser", flash = 0)
-{
-	new defuse = get_pdata_int(id, OFFSET_DEFUSE_PLANT);
-
-	if(defusekit)
-	{
-		new colour[3] = {0, 160, 0}
-		if(r != -1) colour[0] = r;
-		if(g != -1) colour[1] = g;
-		if(b != -1) colour[2] = b;
-    
-    		set_pev(id, pev_body, 1);
-
-		defuse |= (1<<16) ;
-		set_pdata_int(id, OFFSET_DEFUSE_PLANT, defuse);
-		
-		message_begin(MSG_ONE, get_user_msgid("StatusIcon"), _, id);
-		write_byte((flash == 1) ? 2 : 1);
-		write_string(icon[0] ? icon : "defuser");
-		write_byte(colour[0]);
-		write_byte(colour[1]);
-		write_byte(colour[2]);
-		message_end();
-	}
-
-	else
-	{
-		defuse &= ~(1<<16) ;
-		set_pdata_int(id, OFFSET_DEFUSE_PLANT, defuse);
-		message_begin(MSG_ONE, get_user_msgid("StatusIcon"), _, id);
-		write_byte(0);
-		write_string("defuser");
-		message_end();
-		
-		set_pev(id, pev_body, 0);
-	}
 }
 
 stock fm_set_user_godmode(index, godmode = 0)
 {
 	set_pev(index, pev_takedamage, godmode == 1 ? DAMAGE_NO : DAMAGE_AIM);
-	
-	return 1;
 }
 
 stock fm_set_rendering(entity, fx = kRenderFxNone, r = 255, g = 255, b = 255, render = kRenderNormal, amount = 16) 
@@ -2211,20 +2133,17 @@ stock fm_set_rendering(entity, fx = kRenderFxNone, r = 255, g = 255, b = 255, re
 	set_pev(entity, pev_rendercolor, RenderColor);
 	set_pev(entity, pev_rendermode, render);
 	set_pev(entity, pev_renderamt, float(amount));
-	
-	return 1;
 }
 
 stock fm_set_user_velocity(entity, const Float:vector[3])
 {
 	set_pev(entity, pev_velocity, vector);
-
-	return 1;
 }
 
 stock fm_get_user_velocity(entity, Float:vector[3])
-	return pev(entity, pev_velocity, vector)
-
+{
+	return pev(entity, pev_velocity, vector);
+}
 
 stock get_user_weapon_id(const weapon[])
 {
@@ -2239,39 +2158,14 @@ stock dm_game_play()
 	return (g_dm_roundStart && !g_dm_roundEnd);
 }
 
-stock dm_user_tbot(id)
-{
-	if (is_user_bot(id))
-		return 1;
-
-	return 0;
-}
-
-stock bool:has_custom_weapons(id, const bitsum)
-{
-	static weapons[32], num, i, weaponid
-	num = 0
-	get_user_weapons(id, weapons, num)
-	
-	for (i = 0; i < num; i++)
-	{
-		weaponid = weapons[i]
-		
-		if ((1<<weaponid) & bitsum)
-			return true;
-	}
-	
-	return false;
-}
-
 stock str_count(const str[], searchchar)
 {
-	new count, i, len = strlen(str)
+	new count, i, len = strlen(str);
 	
 	for (i = 0; i <= len; i++)
 	{
 		if(str[i] == searchchar)
-			count++
+			count++;
 	}
 	
 	return count;
