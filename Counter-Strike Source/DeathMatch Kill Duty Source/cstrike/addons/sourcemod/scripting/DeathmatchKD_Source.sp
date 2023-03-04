@@ -1,7 +1,7 @@
 
 /* 
-			DeathMatch: Kill Duty Source - Upgrade 1
-				23/2/2018 (Version: 3.0.0)
+			DeathMatch: Kill Duty Source - Upgrade 2
+				5/3/2023 (Version: 3.1.0)
 			
 					HsK-Dev Blog By CCN
 			
@@ -18,7 +18,7 @@ public Plugin:myinfo =
 	name = "DeathMatch: Kill Duty Source",
 	author = "HsK-Dev Blog By CCN",
 	description = "Deathmatch: Kill Duty Source",
-	version = "3.0.0.41",
+	version = "3.1.0.2",
 	url = "http://ccnhsk-dev.blogspot.com/"
 };
 
@@ -82,6 +82,7 @@ new Float:m_showMsgTime[MAXPLAYERS + 1]; // Show Msg Time
 new m_priWeaponID[MAXPLAYERS + 1],  m_secWeaponID[MAXPLAYERS + 1]; // Is Weap set
 new bool:m_godMode[MAXPLAYERS + 1], Float:m_godModeTime[MAXPLAYERS + 1]; // Is Protect 
 new Float:m_spawnTime[MAXPLAYERS + 1]; // Player Spawn Time
+new bool:m_preReady[MAXPLAYERS + 1];
 new Float:m_enforcementSpawnTime[MAXPLAYERS + 1]; // Player Enforcement Spawn Time
 new bool:m_dmdamage[MAXPLAYERS + 1]; // DM Damage
 new bool:m_wSilencerMode[MAXPLAYERS + 1][2]; // M4A1/USP Silencer Mode
@@ -149,7 +150,7 @@ public OnConfigsExecuted()
 	ServerCommand("mp_timelimit 0");
 	ServerCommand("sv_hudhint_sound 0");
 	
-	for (new id = 1; id <= MAX_NAME_LENGTH; id++)
+	for (new id = 1; id <= MaxClients; id++)
 	{
 		PlayerDataReset (id);
 
@@ -494,7 +495,7 @@ public Action:Event_Round_Start(Handle:event, const String:name[], bool:dontBroa
 	if (g_dmMode != MODE_DM)
 		g_dmMode = MODE_TDM;
 		
-	for (new player = 1; player <= MAX_NAME_LENGTH; player++)
+	for (new player = 1; player <= MaxClients; player++)
 	{
 		PlayerDataReset (player);
 	}
@@ -508,7 +509,7 @@ public Action:Event_RoundFreezeEnd(Handle:event, const String:name[], bool:dontB
 	
 	new ingame_player = 0;
 
-	for (new player = 1; player <= MAX_NAME_LENGTH; player++)
+	for (new player = 1; player <= MaxClients; player++)
 	{
 		if (!IsClientConnected(player) || !IsClientInGame(player)) continue;
 
@@ -561,7 +562,7 @@ public dm_roundEnd ()
 	else
 		Format(playSound, sizeof(playSound), "radio/terwin.wav");
 		
-	for (new player = 1; player <= MAX_NAME_LENGTH; player++)
+	for (new player = 1; player <= MaxClients; player++)
 	{
 		if (!IsClientConnected(player) || IsFakeClient (player))
 			continue;
@@ -660,12 +661,14 @@ public OnGameFrame ()
 	
 	if (!g_dmGameStart)
 	{
+
 		if (g_secondThinkTime <= gameTime && RoundToZero(g_freezeTime) - RoundToZero(gameTime) == 4)
 		{
-			for (new player = 1; player <= MAX_NAME_LENGTH; player++)
+			for (new player = 1; player <= MaxClients; player++)
 			{
-				if (!IsClientConnected(player) || !IsClientInGame(player)) continue;
+				if (!IsClientConnected(player) || !IsClientInGame(player) || m_preReady[player]) continue;
 				
+				m_preReady[player] = true;
 				PlayerSpawn(player);
 			}
 		}
@@ -1059,7 +1062,7 @@ public Player_Spawn(client)
 {
 	if (!IsPlayerAlive(client))
 		CS_RespawnPlayer(client);
-		
+	
 	for (new i = 0; i < 2; i++)
 	{
 		new weaponEntity = GetPlayerWeaponSlot(client, i);
@@ -1099,6 +1102,7 @@ public Player_Spawn(client)
 			continue;
 			
 		SetEntProp(weaponEntityId[i],Prop_Send,"m_bSilencerOn", 1);
+		SetEntProp(weaponEntityId[i],Prop_Send,"m_weaponMode", 1);
 	}
 }
 // ===============================
@@ -1191,6 +1195,7 @@ public PlayerDataReset(client)
 	m_secWeaponID[client] = -1;
 	m_godModeTime[client] = -1.0;
 	m_spawnTime[client] = -1.0;
+	m_preReady[client] = false;
 	m_enforcementSpawnTime[client] = -1.0;
 	m_godMode[client] = false;
 	m_dmdamage[client] = false;
@@ -1238,7 +1243,7 @@ public Set_Origin(client)
 		new Float:spawnOrigin[3];
 		spawnOrigin = g_spawns[GetRandomInt(0, g_spawnCount-1)];
 		
-		for (new player = 1; player <= MAX_NAME_LENGTH; player++)
+		for (new player = 1; player <= MaxClients; player++)
 		{
 			if (client == player || !IsClientConnected(player) || !IsClientInGame(player) || !IsPlayerAlive (player))
 				continue;
