@@ -18,7 +18,7 @@ public Plugin:myinfo =
 	name = "DeathMatch: Kill Duty Source",
 	author = "HsK-Dev Blog By CCN",
 	description = "Deathmatch: Kill Duty Source",
-	version = "3.1.0.2",
+	version = "3.2.0.4",
 	url = "http://ccnhsk-dev.blogspot.com/"
 };
 
@@ -61,6 +61,8 @@ new g_tdmBuyZoneAddHpStart; // TDM Mode BuyZone Add HP On
 new Float:g_tdmBuyZoneAddHpTime; // TDM Mode BuyZone Add HP Time
 new g_tdmBuyZoneAddHp; // TDM Mode BuyZone Add HP
 new g_dmKillEnemyAddHP; // DM Mode Kill Enemy Add HP
+new g_dmKillEnemyAddHPHS; // DM Mode Kill Enemy Add HP
+new g_dmKillEnemyAddHPKnife; // DM Mode Kill Enemy Add HP
 
 new g_nextMapId, Float:g_changeMapTime; // Map Change
 
@@ -118,7 +120,7 @@ public OnPluginStart()
 
 public OnConfigsExecuted()
 {
-	g_dmMode = -1;
+	g_dmMode = GetRandomInt (0, 1);
 	GameDataReset();
 		
 	DMBaseSetting();
@@ -164,7 +166,7 @@ public OnConfigsExecuted()
 // DM:KD-S Setting =========
 public DMBaseSetting()
 {
-	g_dmMode = MODE_TDM;
+	g_dmMode = GetRandomInt(0, 1);
 	g_spawnTime = 3.0;
 	g_spawnGodTime = 3.0;
 	g_enforcementSpawnTime = 8.0;
@@ -182,6 +184,8 @@ public DMBaseSetting()
 	g_tdmBuyZoneAddHpTime = 5.0;
 	g_tdmBuyZoneAddHp = 10;
 	g_dmKillEnemyAddHP = 20;
+	g_dmKillEnemyAddHPHS = 30;
+	g_dmKillEnemyAddHPKnife = 100;
 	
 	g_priweaponNum = 3;
 	g_priweaponID[0] = get_user_weapon_id("weapon_awp");
@@ -235,7 +239,13 @@ public LoadDMSettingFile()
 				TrimString(Setting_value[0]);
 				TrimString(Setting_value[1]);
 
-				if(!strcmp(Setting_value[0], "DM MoD", false)) g_dmMode = StringToInt(Setting_value[1]);
+				if(!strcmp(Setting_value[0], "DM MoD", false))
+				{
+					g_dmMode = StringToInt(Setting_value[1]);
+					if (g_dmMode != MODE_TDM && g_dmMode != MODE_DM)
+						g_dmMode = GetRandomInt(0, 1);
+					
+				}
 				else if(!strcmp(Setting_value[0], "Player Respawn Time", false)) g_spawnTime = StringToFloat(Setting_value[1]);
 				else if(!strcmp(Setting_value[0], "Player Protect Time", false)) g_spawnGodTime = StringToFloat(Setting_value[1]);
 				else if(!strcmp(Setting_value[0], "Player Enforcement Respawn Time", false)) g_enforcementSpawnTime = StringToFloat(Setting_value[1]);
@@ -259,6 +269,8 @@ public LoadDMSettingFile()
 				else if(!strcmp(Setting_value[0], "Buyzone Add HP Amount", false)) g_tdmBuyZoneAddHp = StringToInt(Setting_value[1]);
 
 				else if(!strcmp(Setting_value[0], "Kill Enemy Add HP", false)) g_dmKillEnemyAddHP = StringToInt(Setting_value[1]);
+				else if(!strcmp(Setting_value[0], "Kill Enemy Add HP Headshot", false)) g_dmKillEnemyAddHPHS = StringToInt(Setting_value[1]);
+				else if(!strcmp(Setting_value[0], "Kill Enemy Add HP Knife", false)) g_dmKillEnemyAddHPKnife = StringToInt(Setting_value[1]);
 			}
 			case 2: 
 			{
@@ -462,10 +474,13 @@ public Action:Command_ChangeTeam(client, const String:command[], args)
 	
 	CS_SwitchTeam(client, joinTeam);
 	
+	m_spawnTime[client] = GetGameTime() + g_spawnTime;
+	
 	if (!dm_GameRun())
+	{
+		m_spawnTime[client] = GetGameTime() + 2.0;
 		CS_RespawnPlayer (client);
-	else 
-		m_spawnTime[client] = GetGameTime() + g_spawnTime;
+	}
 
 	return Plugin_Handled;
 }
@@ -525,6 +540,9 @@ public Action:Event_RoundFreezeEnd(Handle:event, const String:name[], bool:dontB
 			g_maxKill = GetRandomInt (5, 7) * ingame_player;
 		else
 			g_maxKill = GetRandomInt (2, 3) * (ingame_player - 1);
+			
+		g_maxKill /= 10;
+		g_maxKill *= 10;
 	}
 	else
 		g_maxKill = g_maxKillData;
@@ -746,8 +764,7 @@ public SDK_PreThink(client)
 	if (isAlive)
 	{
 		SetEntData(client, g_iAccount, 0);
-		m_inGamePlayer[client] = true;
-		
+
 		m_enforcementSpawnTime[client] = -1.0;
 
 		if (g_ammoUnlimitbp)
@@ -850,9 +867,21 @@ public Action:Event_PlayerDeath(Handle:event, const String:name[], bool:dontBroa
 
 	if (g_dmMode == MODE_DM)
 	{
-		if (g_dmKillEnemyAddHP > 0)
+		new killerAddHP = g_dmKillEnemyAddHP;
+		if(g_dmKillEnemyAddHPHS > 0 && GetEventBool(event, "headshot"))
+			killerAddHP = g_dmKillEnemyAddHPHS;
+		
+		if (g_dmKillEnemyAddHPKnife > 0)
 		{
-			new health = GetClientHealth(attacker) + g_dmKillEnemyAddHP;
+			char weapon[32];
+			GetEventString(event, "weapon", weapon, sizeof(weapon));
+			if (StrEqual(weapon, "knife") || StrEqual(weapon, "knife_t"))
+				killerAddHP = g_dmKillEnemyAddHPKnife;
+		}
+	
+		if (killerAddHP > 0)
+		{
+			new health = GetClientHealth(attacker) + killerAddHP;
 			if (health > 100)
 				SetEntityHealth(attacker, 100);
 			else
@@ -1110,10 +1139,10 @@ public Player_Spawn(client)
 // Remove Weapon ===============
 public Action:CS_OnCSWeaponDrop(client, weaponIndex) 
 {
-	if (g_removeDropWeaponTime <= 0.1)
-		return;
+	if (g_removeDropWeaponTime >= 0.1)
+		CreateTimer(0.1, RemoveWeaponCheck, weaponIndex);
 	
-	CreateTimer(0.1, RemoveWeaponCheck, weaponIndex);
+	return Plugin_Continue;
 }
 
 public Action: RemoveWeaponCheck(Handle:timer, any:weaponIndex )
