@@ -2,11 +2,11 @@
 
 Working: N/A
 
-DeathMatch: Kill Duty - v3.1.1
+DeathMatch: Kill Duty - v3.2.0
  - Counter-Strike 1.6
  - Download: https://ccnhsk-dev.blogspot.com/search/label/DMKD%20Download
 
-DeathMatch: Kill Duty Source  - v3.0.0
+DeathMatch: Kill Duty Source  - v3.2.0
  - Counter-Strike: Source
  - Download: https://ccnhsk-dev.blogspot.com/search/label/DMKD-S%20Download
 

@@ -1,7 +1,7 @@
 
 /* 
-			DeathMatch: Kill Duty 3.1.1
-				28/1/2023 (Version: 3.1.1)
+			DeathMatch: Kill Duty 3.2.0
+				7/3/2023 (Version: 3.2.0)
 			
 					HsK-Dev Blog By CCN
 			
@@ -15,7 +15,7 @@
 #include <hamsandwich>
 
 #define PLUGIN	"Deathmatch: Kill Duty"
-#define VERSION	"3.1.1.3"
+#define VERSION	"3.2.0.3"
 #define AUTHOR	"HsK-Dev Blog By CCN"
 
 new const MAX_BPAMMO[] = { -1, 52, -1, 90, 1, 32, 1, 100, 90, 1, 120, 100, 100, 90, 90, 90, 100, 120,

@@ -9,6 +9,13 @@ Need:
  - AMX Mod X
 
 _____________________________
+DeathMatch: Kill Duty 3.2.0
+Version: 3.2.0 (7/3/2023)
+ - Add DM Mode HeadShot/Knife Kill Add HP
+ - Add DM Mode Kill Enemy/ Round Finish Sound Effect
+ - Base improve / Debug
+
+_____________________________
 DeathMatch: Kill Duty 3.1.1
 Version: 3.1.1 (28/1/2023)
  - Fixed DM Mode Less Spawn Point Stuck

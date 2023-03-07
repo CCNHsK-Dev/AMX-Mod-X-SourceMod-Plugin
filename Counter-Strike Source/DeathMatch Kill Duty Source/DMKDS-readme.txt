@@ -9,6 +9,14 @@ Need:
  - SourceMod 
  
 _____________________________
+DeathMatch: Kill Duty Source 3.2.0
+Version: 3.2.0 (7/3/2023)
+ - Add DM Mode HeadShot/Knife Kill Add HP
+ - Fixed About Save M4A1/USP Silenced
+ - Base improve
+ - Base Bugs fixed
+
+_____________________________
 DeathMatch: Kill Duty Source - Upgrade 1
 Version: 3.0.0 (23/2/2018)
  - Support Lastly SourceMod
