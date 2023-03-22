@@ -1,7 +1,7 @@
 
 /* 
-			DeathMatch: Kill Duty 3.2.0
-				7/3/2023 (Version: 3.2.0)
+			DeathMatch: Kill Duty 3.2.1
+				7/3/2023 (Version: 3.2.1)
 			
 					HsK-Dev Blog By CCN
 			
@@ -15,7 +15,7 @@
 #include <hamsandwich>
 
 #define PLUGIN	"Deathmatch: Kill Duty"
-#define VERSION	"3.2.0.3"
+#define VERSION	"3.2.1.1"
 #define AUTHOR	"HsK-Dev Blog By CCN"
 
 new const MAX_BPAMMO[] = { -1, 52, -1, 90, 1, 32, 1, 100, 90, 1, 120, 100, 100, 90, 90, 90, 100, 120,
@@ -578,6 +578,7 @@ public event_round_start()
 		playerDataReset (id, true);
 		dm_menu_weap(id);
 	}
+	server_cmd("mp_scoreboard_showmoney 0");
 }
 
 public logevent_round_start()
@@ -587,6 +588,8 @@ public logevent_round_start()
 
 	if (g_dmMode == MODE_TDM)
 	{
+		server_cmd("mp_scoreboard_showhealth 3");
+	
 		if (g_MaxKill == 0)
 		{
 			new maxKill = random_num(5, 7) * iNum;
@@ -601,6 +604,8 @@ public logevent_round_start()
 	}
 	else
 	{
+		server_cmd("mp_scoreboard_showhealth 0");
+	
 		if (g_MaxKill == 0)
 		{
 			new maxKill = random_num(2, 3) * (iNum-1);
