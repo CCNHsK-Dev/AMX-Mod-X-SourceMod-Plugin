@@ -15,7 +15,7 @@
 #include <hamsandwich>
 
 #define PLUGIN	"Deathmatch: Kill Duty"
-#define VERSION	"3.2.1.1"
+#define VERSION	"3.2.1.2"
 #define AUTHOR	"HsK-Dev Blog By CCN"
 
 new const MAX_BPAMMO[] = { -1, 52, -1, 90, 1, 32, 1, 100, 90, 1, 120, 100, 100, 90, 90, 90, 100, 120,
@@ -898,10 +898,10 @@ public fw_startFrame ()
 				}
 			}
 		}
+		
+		if (g_dm_roundEnd && g_nextRoundMap != -1 && g_nextRoundTime <= gameTime)
+			server_cmd("changelevel %s", g_Nmap_name[g_nextRoundMap]);
 	}
-
-	if (g_dm_roundEnd && g_nextRoundMap != -1 && g_nextRoundTime <= gameTime)
-		server_cmd("changelevel %s", g_Nmap_name[g_nextRoundMap]);
 }
 
 public fw_PlayerPreThink (id)
