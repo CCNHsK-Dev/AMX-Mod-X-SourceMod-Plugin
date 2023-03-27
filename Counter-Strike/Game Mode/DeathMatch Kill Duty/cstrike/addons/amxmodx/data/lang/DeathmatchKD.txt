@@ -1,67 +1,72 @@
 
 [en]
-GAMETIME_MSG = GAME TIME %d:%2.2d
+GAMETIME_MSG = GAME TIME %d:%02d
 ROUNDTIME_MSG = ROUND TIME %d Min
 
 TDM_KILL_MSG_READY = Deathmatch: Kill Duty^nTeam Deathmatch Mode
 DM_KILL_MSG_READY = Deathmatch: Kill Duty^nDeathmatch Mode
 
-MAX_KILL_MSG = /- MAX %d -/
-TDM_KILL_MSG = CT %d|%d TR
-DM_KILL_MSG = Your %d
+MAX_KILL_MSG = /- Target %d -/
+TDM_KILL_MSG = CT %d | %d TR
+DM_KILL_MSG = Your Kill Count %d
 
 DM_TOPKILLER_MSG = Top Killer '%s' ^nKill '%d' Player
 
-TR_WIN_MSG = !!TR WiN!! ^n Next Map is [%s]
-CT_WIN_MSG = !!CT WiN!! ^n Next Map is [%s]
-PL_WIN_MSG = !![%s] WiN!! ^n Next Map is [%s]
+TR_WIN_MSG = !!TR Win!! ^n Next Map is [%s]
+CT_WIN_MSG = !!CT Win!! ^n Next Map is [%s]
+PL_WIN_MSG = !![%s] Win!! ^n Next Map is [%s]
 
-TDM_GS_MSG = !!!Game StraT!!! TeaM MiX Kill IS: %d
-PDM_GS_MSG = !!!Game StraT!!! Player MiX Kill IS: %d
-GS_TIMEONLY_MSG = !!!Game StraT!!!
+TDM_GS_MSG = !!!Game Start!!! Team Target Kill Count: %d
+PDM_GS_MSG = !!!Game Start!!! Player Target Kill Count: %d
+GS_TIMEONLY_MSG = !!!Game Start!!!
 
 INEV_RES_MSG = %.1f 's will spawn
 
-AGET_WEAP_MEUN1 = [DM: KD] Get Your Weap
-AGET_WEAP_MEUN2 = Get New Weap
-AGET_WEAP_MEUN3 = Use last time Weap
+AGET_WEAP_MENU1 = [DM:KD] Choose Your Weapon
+AGET_WEAP_MENU2 = Get New Weapon
+AGET_WEAP_MENU3 = Use Last time Weapon
+AGET_WEAP_MENU4 = Your Last Time Weapon Is:
 
-AGET_WEAP_MEUN3_N = You has not last Time Weap
-
-PRI_WM_NAME = [DM: KD] Get your Pri Weap
-SEC_WM_NAME = [DM: KD] Get your Sec Weap
+PRI_WM_NAME = [DM:KD] Choose your Pri Weapon
+SEC_WM_NAME = [DM:KD] Choose your Sec Weapon
 
 MENU_BACK = Back
 MENU_NEXT = Next
 MENU_EXIT = Exit
 
 COUNTDOWN_MSG = %d 's will strat game!
+CHANGEMAP_TIME = %d 's will Change the Map
+RELOAD_SPAWNPOINT = Auto Add to 16 SpawnPoint, Restart on %d 's
 
 TDM_KILLER_MSG = You Kill Player '%s', Your kill '%d' player
 DM_KILLER_MSG = You Kill Player '%s', Your kill '%d/%d' player
 DM_DEAD_MSG = Player '%s' kill you
 
-WILL_ADD_HP = [DM: KD] you in the buy zone, will add hp!
-WILL_NOT_ADD_HP = [DM: KD] you exit buy zone..
-ADD_HP_IN_BZN = [DM: KD] you in the buy zone %.1f 's, add %d hp!!
+WILL_ADD_HP = [DM:KD] you in the buy zone, will add hp!
+WILL_NOT_ADD_HP = [DM:KD] you exit buy zone.
+ADD_HP_IN_BZN = [DM:KD] you in the buy zone %.1f 's, add %d hp!!
 
-ADMIN_SET_M1 = [DM: KD] Admin Set DM Game
+ADMIN_SET_M1 = [DM:KD] Admin Menu
 ADMIN_SET_M2 = Set New Spawns
 
 PDM_AIM_TEXT = Enemy
 
-ERROR_PDM = MAP[%s] have not spawns. this round is TDM Mod
+DONT_FIND_SPAWNPOINT = [DM:KD] MAP[%s] has not spawn point, change to TDM Mode/ Turn off TDM Random Spawn.
+
+NOT_ADMIN_PLAYER = [DM:KD] You Are not Admin
 
 [tc]
-GAMETIME_MSG = GAME TIME %d:%2.2d
+GAMETIME_MSG = GAME TIME %d:%02d
 ROUNDTIME_MSG = ROUND TIME %d Min
 
 TDM_KILL_MSG_READY = Deathmatch: Kill Duty^nTeam Deathmatch Mode
 DM_KILL_MSG_READY = Deathmatch: Kill Duty^nDeathmatch Mode
 
-MAX_KILL_MSG = /- MAX %d -/
-TDM_KILL_MSG = CT %d|%d TR
-DM_KILL_MSG = Your %d
+MAX_KILL_MSG = /- 目標擊殺數 %d -/
+TDM_KILL_MSG = 反恐精英 %d | %d 恐怖份子
+DM_KILL_MSG = 你的擊殺數 %d
+
+DM_TOPKILLER_MSG = Top Killer '%s' ^n共擊殺了 '%d' 位玩家
 
 TR_WIN_MSG = !!恐怖份子 勝利!! ^n 下一張地圖為 [%s]
 CT_WIN_MSG = !!反恐精英 勝利!! ^n 下一張地圖為 [%s]
@@ -73,34 +78,35 @@ GS_TIMEONLY_MSG = !!!遊戲開始!!!
 
 INEV_RES_MSG = %.1f 秒後張被強制復活
 
-AGET_WEAP_MEUN1 = [DM: KD] 選擇你的武器
-AGET_WEAP_MEUN2 = 選擇新的武器
-AGET_WEAP_MEUN3 = 選擇上回合的武器
+AGET_WEAP_MENU1 = [DM:KD] 選擇你的武器
+AGET_WEAP_MENU2 = 選擇新的武器
+AGET_WEAP_MENU3 = 選擇上次的武器
+AGET_WEAP_MENU4 = 你上次的武器:
 
-AGET_WEAP_MEUN3_N = 請先選擇新的武器
-
-PRI_WM_NAME = [DM: KD] 選擇你的主武器
-SEC_WM_NAME = [DM: KD] 選擇你的副武器
+PRI_WM_NAME = [DM:KD] 選擇你的主武器
+SEC_WM_NAME = [DM:KD] 選擇你的副武器
 
 MENU_BACK = 上一頁
 MENU_NEXT = 下一頁
 MENU_EXIT = 離開
 
 COUNTDOWN_MSG = 遊戲在 %d 秒後開始
+CHANGEMAP_TIME = %d 's will Change the Map
+RELOAD_SPAWNPOINT = Auto Add to 16 SpawnPoint, Restart on %d 's
 
 TDM_KILLER_MSG = 你擊殺了玩家 '%s', 你共擊殺了 '%d' 位玩家
 DM_KILLER_MSG = 你擊殺了玩家 '%s', 你共擊殺了 '%d/%d' 位玩家
 DM_DEAD_MSG = 玩家 '%s' 擊殺了你
 
-DM_TOPKILLER_MSG = Top Killer '%s' ^n共擊殺了 '%d' 位玩家
+WILL_ADD_HP = [DM:KD] 你在購買區, 張會補充血量!
+WILL_NOT_ADD_HP = [DM:KD] 你離開購買區...
+ADD_HP_IN_BZN = [DM:KD] 你在購買區 %.1f 秒, 補充 %d 血量!!
 
-WILL_ADD_HP = [DM: KD] 你在購買區, 張會補充血量!
-WILL_NOT_ADD_HP = [DM: KD] 你離開購買區...
-ADD_HP_IN_BZN = [DM: KD] 你在購買區 %.1f 秒, 補充 %d 血量!!
-
-ADMIN_SET_M1 = [DM: KD] DM: KD 管理
+ADMIN_SET_M1 = [DM:KD] DM:KD 管理
 ADMIN_SET_M2 = 設置目前位置為重新點
 
 PDM_AIM_TEXT = 敵人
 
-ERROR_PDM = 本地圖 [%s] 沒有重生點, 因此遊戲模式改為團隊死鬥
+DONT_FIND_SPAWNPOINT = [DM:KD] 本地圖 [%s] 沒有重生點, 因此遊戲模式改為團隊死鬥
+
+NOT_ADMIN_PLAYER = [DM:KD] 你不是管理員

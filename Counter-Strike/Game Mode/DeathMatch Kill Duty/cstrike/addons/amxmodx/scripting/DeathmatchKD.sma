@@ -15,7 +15,7 @@
 #include <hamsandwich>
 
 #define PLUGIN	"Deathmatch: Kill Duty"
-#define VERSION	"3.3.0.7"
+#define VERSION	"3.3.0.8"
 #define AUTHOR	"HsK-Dev Blog By CCN"
 
 new const MAX_BPAMMO[] = { -1, 52, -1, 90, 1, 32, 1, 100, 90, 1, 120, 100, 100, 90, 90, 90, 100, 120,
@@ -515,7 +515,7 @@ stock LoadSpawnPoint()
 	
 	if (g_spawnCount == 0)
 	{
-		server_print("%L", LANG_PLAYER, "ERROR_PDM", mapname);
+		server_print("%L", LANG_PLAYER, "DONT_FIND_SPAWNPOINT", mapname);
 		g_dmMode = MODE_TDM;
 		g_dm_randomSpawn = false;
 	}
@@ -524,13 +524,10 @@ stock LoadSpawnPoint()
 public addBaseSpawnPoint (basePointCount, team, const classname[])
 {
 	new entity;
-	new i = 0;
 	while ((entity = engfunc(EngFunc_FindEntityByString, entity, "classname", classname)))
 	{
 		if (basePointCount >= 16)
 			break;
-
-		i++;
 
 		new Float:origin[3], Float:angles[3];
 		pev(entity, pev_origin, origin);
@@ -564,8 +561,6 @@ public addBaseSpawnPoint (basePointCount, team, const classname[])
 		format(buffer, charsmax(buffer), "%d %f %f %f %f %f %f ^n", 
 		team, origin[0], origin[1], origin[2], angles[0], angles[1], angles[2]);
 		fputs(file, buffer);
-
-		server_print ("Team:%d Num:%d Entity:%d", team, i, newspawnPoint);
 
 		fclose(file);
 		basePointCount++;
@@ -607,7 +602,7 @@ public GetGameMap()
 public dm_adminSettingMenu(id)
 {
 	if (!(get_user_flags(id) & ACCESS_FLAG))
-		client_print(id, print_chat, "You Are not Admin");
+		client_print(id, print_chat, "%L", id, "NOT_ADMIN_PLAYER");
 	else
 	{
 		static menu[250], len;
@@ -697,7 +692,7 @@ public event_round_start()
 	DM_BaseGameSetting ();
 
 	if (g_makeNewBaseSpawn)
-		g_startTimeData = 8;
+		g_startTimeData = 6;
 	
 	g_startTime = g_startTimeData + floatround(get_gametime ());
 	g_secondThinkTime = get_gametime ();
@@ -739,7 +734,7 @@ public logevent_round_start()
 			g_maxKill = g_maxKillData[g_dmMode];
 		else if (g_maxKillData[g_dmMode] == 0)
 		{
-			new maxKill = (g_dmMode == MODE_TDM) ? random_num(5, 7) : random_num(3, 5)  * playNum;
+			new maxKill = ((g_dmMode == MODE_TDM) ? random_num(5, 7) : random_num(3, 5)) * playNum;
 			maxKill /= 10;
 			maxKill *= 10;
 			if (maxKill < 10)
@@ -876,9 +871,11 @@ public fw_PlayerKilled(victim, attacker, shouldgib)
 
 	dm_DeathAction (victim, hitzone, gameTime);
 
-	if (attacker == victim || attacker > 32 || !attacker)
+	if (attacker == victim || !is_user_connected (attacker))
 	{
-		set_pev(attacker, pev_frags, float(pev(attacker, pev_frags)-1));
+		if (attacker == victim)
+			set_pev(attacker, pev_frags, float(pev(attacker, pev_frags)-1));
+
 		SendDeathMsg(attacker, victim, "worldspawn", 1);
 		return HAM_SUPERCEDE;
 	}
@@ -1027,9 +1024,14 @@ public fw_startFrame ()
 			}
 		}
 	}
-		
-	if (g_dm_roundEnd && g_nextRoundMap != -1 && g_nextRoundTime <= gameTime)
-		server_cmd("changelevel %s", g_nextMapName[g_nextRoundMap]);
+
+	if (g_dm_roundEnd && g_nextRoundMap != -1)
+	{
+		client_print(0, print_center,"%L", LANG_PLAYER, "CHANGEMAP_TIME", floatround(g_nextRoundTime - gameTime));
+
+		if (g_nextRoundTime <= gameTime)
+			server_cmd("changelevel %s", g_nextMapName[g_nextRoundMap]);
+	}
 }
 
 public fw_PlayerPreThink (id)
@@ -1213,9 +1215,39 @@ public dm_menu_weap(id)
 	static menu[250], len;
 	len = 0;
 
-	len += formatex(menu[len], sizeof menu - 1 - len, "\y %L^n^n", id, "AGET_WEAP_MEUN1");
-	len += formatex(menu[len], sizeof menu - 1 - len, "\r1.\w %L ^n", id, "AGET_WEAP_MEUN2");
-	len += formatex(menu[len], sizeof menu - 1 - len, "\r2.\w %L^n", id, "AGET_WEAP_MEUN3");
+	len += formatex(menu[len], sizeof menu - 1 - len, "\y %L^n^n", id, "AGET_WEAP_MENU1");
+	len += formatex(menu[len], sizeof menu - 1 - len, "\r1.\w %L ^n", id, "AGET_WEAP_MENU2");
+	len += formatex(menu[len], sizeof menu - 1 - len, "\r2.\w %L^n^n^n", id, "AGET_WEAP_MENU3");
+	len += formatex(menu[len], sizeof menu - 1 - len, "\r %L^n", id, "AGET_WEAP_MENU4");
+
+	if (m_pri_weaponid[id] == 0)
+		len += formatex(menu[len], sizeof menu - 1 - len, "\w N/A^n");
+	else
+	{
+		for (new i = 0; i < g_priweapon; i++)
+		{
+			if (m_pri_weaponid[id] != g_priweaponID[i])
+				continue;
+
+			len += formatex(menu[len], sizeof menu - 1 - len, "\w %s^n", g_priweaponN[i]);
+			break;
+		}
+	}
+
+	if (m_sec_weaponid[id] == 0)
+		len += formatex(menu[len], sizeof menu - 1 - len, "\w N/A");
+	else
+	{
+		for (new i = 0; i < g_secweapon; i++)
+		{
+			if (m_sec_weaponid[id] != g_secweaponID[i])
+				continue;
+
+			len += formatex(menu[len], sizeof menu - 1 - len, "\w %s^n", g_secweaponN[i]);
+			break;
+		}
+	}
+
 
 	show_menu(id, KEYSMENU, menu, -1, "UsE WeapoN MeuN");
 }
@@ -1507,10 +1539,23 @@ public dm_user_spawn(id)
 // Plug-in Function =======
 public SetBotMode (gamePlay)
 {
-	if (gamePlay)
-		server_cmd("sypb_gamemod %d", g_dmMode);
-	else
+	if (!gamePlay)
+	{
 		server_cmd("sypb_gamemod 3");
+		server_cmd("ebot_gamemod 3");
+		server_cmd("yb_ignore_enemies 1");
+		
+		return;
+	}
+
+	server_cmd("sypb_gamemod %d", g_dmMode);
+	server_cmd("ebot_gamemod %d", g_dmMode);
+	server_cmd("yb_ignore_enemies 0");
+	
+	if (g_dmMode == MODE_DM) 
+		server_cmd("yb_csdm_mode 2");
+	else
+		server_cmd("yb_csdm_mode 1");
 }
 
 public RoundCountDown ()
@@ -1522,7 +1567,8 @@ public RoundCountDown ()
 
 	if (g_makeNewBaseSpawn)
 	{
-		client_print(0, print_center,"Auto Add to 16 SpawnPoint, Restart on %d's", countDownTime);
+		//client_print(0, print_center,"Auto Add to 16 SpawnPoint, Restart on %d's", countDownTime);
+		client_print(0, print_center,"%L", LANG_PLAYER, "RELOAD_SPAWNPOINT", countDownTime);
 		return;
 	}
 
