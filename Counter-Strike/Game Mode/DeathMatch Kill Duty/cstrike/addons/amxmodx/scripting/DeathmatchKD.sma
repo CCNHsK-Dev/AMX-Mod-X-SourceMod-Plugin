@@ -1,7 +1,7 @@
 
 /* 
 			DeathMatch: Kill Duty 3.3.0
-				27/3/2023 (Version: 3.3.0)
+				6/4/2023 (Version: 3.3.0)
 			
 					HsK-Dev Blog By CCN
 			
@@ -15,7 +15,7 @@
 #include <hamsandwich>
 
 #define PLUGIN	"Deathmatch: Kill Duty"
-#define VERSION	"3.3.0.8"
+#define VERSION	"3.3.0.9"
 #define AUTHOR	"HsK-Dev Blog By CCN"
 
 new const MAX_BPAMMO[] = { -1, 52, -1, 90, 1, 32, 1, 100, 90, 1, 120, 100, 100, 90, 90, 90, 100, 120,
@@ -83,7 +83,7 @@ new g_maxKill; // Max Kill
 new g_CT_kill, g_TR_kill; // CT and TR Kill [tdm]
 new g_topKiller[2]; // Top Killer [0=ID/1=Kill Num]
 new g_winIndex; // Win Team / Player Id
-new g_maxKillData[2];
+new g_maxKillData[2]; // Load Max Kill Data
 
 new g_nextMapNum, g_nextMapName[256][32], g_nextRoundMap; // Next Map
 new Float:g_nextRoundTime; // Change Next Map Time
@@ -92,13 +92,15 @@ new g_spawnCount; // Spawan Point Num
 new Float:g_spawnPoint[128][3]; // Spawn Point Origin
 new Float:g_spawnAngles[128][3]; // Spawn Point Angles
 new bool:g_dm_randomSpawn; // Random Spawn
-new bool:g_makeNewBaseSpawn;
+
+new bool:g_makeNewBaseSpawn; // Make New Spawn Point Now
+new g_newBaseSpawnCount[2]; // New Spawn Count
 
 new Float:g_spawnTime; // Player Respawn Time
 new Float:g_spawnGodTime; // Player Protect Time
 new Float:g_spawnMaxTime; // Player Enforcement Respawn Time
 new Float:g_weaponRemoveTime; // Remove Dropped Weapon Time
-new Float:g_deadSeePlayerTime; // Dead Player see Killer Time
+new Float:g_deadSeeKillerTime; // Dead Player see Killer Time
 
 new bool:g_blockSuicide; // Block player Suicide
 
@@ -128,10 +130,11 @@ new m_pri_weaponid[33]; // Pri Weap id
 new m_sec_weaponid[33]; // Sec Weap id
 new bool:m_weaponSilen[33][2]; // Save M4A1 / USP Silen
 
-new m_deadSeePlayer[33]; // Player Dead See the Killer
+new m_deadSeeKiller[33]; // Player Dead See the Killer
+new Float:m_deadSeeKillerTime[33][3]; // Player Dead See the Killer Time Data
+
 new bool:m_dmdamage[33] = false;  // DM Damage
 
-new Float:m_deadSeePlayerTime[33][3]; // Player Dead See the Killer Time Data
 new Float:m_showHudMsgTime[33]; // Updata Hud Msg Time
 new Float:m_showKillMSGTime[33]; // Show Kill Hud Msg Time
 new Float:m_setDeadFlagTime[33]; // Set Dead Flag Time
@@ -240,7 +243,7 @@ LoadDMKDSetting ()
 	g_dmModeKillerAddHP = 20;
 	g_dmModeKillerAddHPHS = 30;
 	g_dmModeKillerAddHPKN = 100;
-	g_deadSeePlayerTime = 4.0;
+	g_deadSeeKillerTime = 4.0;
 	g_dm_randomSpawn = false;
 	g_makeNewBaseSpawn = false;
 	
@@ -324,7 +327,7 @@ LoadDMSettingFile()
 				else if (equal(key, "Player Respawn Time")) g_spawnTime = str_to_float(value);
 				else if (equal(key, "Player Protect Time")) g_spawnGodTime = str_to_float(value);
 				else if (equal(key, "Player Enforcement Respawn Time")) g_spawnMaxTime = str_to_float(value);
-				else if (equal(key, "Player Dead Check Attacker Time")) g_deadSeePlayerTime = str_to_float(value);
+				else if (equal(key, "Player Dead Check Attacker Time")) g_deadSeeKillerTime = str_to_float(value);
 				else if (equal(key, "Remove Dropped Weapon Time")) g_weaponRemoveTime = str_to_float(value);
 				else if (equal(key, "Block Player Suicide")) g_blockSuicide = str_to_bool(value);
 				else if (equal(key, "Unlimited Ammo")) g_unlimitAmmo = str_to_bool(value);
@@ -410,6 +413,9 @@ public SaveSpawnPoint(id)
 
 stock LoadBasePoint()
 {
+	g_newBaseSpawnCount[0] = 0;
+	g_newBaseSpawnCount[1] = 0;
+	
 	new cfgdir[32], mapname[32], filepath[100], linedata[64];
 	get_configsdir(cfgdir, charsmax(cfgdir));
 	get_mapname(mapname, charsmax(mapname));
@@ -437,11 +443,13 @@ stock LoadBasePoint()
 			{
 				newspawnPoint = engfunc(EngFunc_CreateNamedEntity,engfunc(EngFunc_AllocString,"info_player_start"));
 				set_pev(newspawnPoint,pev_classname, "info_player_start");
+				g_newBaseSpawnCount[0]++;
 			}
 			else
 			{
 				newspawnPoint = engfunc(EngFunc_CreateNamedEntity,engfunc(EngFunc_AllocString,"info_player_deathmatch"));
 				set_pev(newspawnPoint,pev_classname, "info_player_deathmatch");
+				g_newBaseSpawnCount[1]++;
 			}
 
 			set_pev(newspawnPoint, pev_origin, origin);
@@ -503,11 +511,15 @@ stock LoadSpawnPoint()
 	if (trSpawnPoint > 0 && trSpawnPoint < 16)
 		addBaseSpawnPoint (trSpawnPoint, 1, "info_player_deathmatch");
 
+	ctSpawnPoint -= g_newBaseSpawnCount[0];
+	trSpawnPoint -= g_newBaseSpawnCount[1];
+
 	server_print("==========================");
 	server_print("= [Deathmatch: Kill Duty]     ");
 	server_print("= MAP : %s", mapname);
 	server_print("= Load Spawns.....");
-	server_print("= Base CT Point: %d TR Point: %d", ctSpawnPoint, trSpawnPoint);
+	server_print("= Base CT Point: %d | TR Point: %d", ctSpawnPoint, trSpawnPoint);
+	server_print("= New  CT Point: %d | TR Point: %d", g_newBaseSpawnCount[0], g_newBaseSpawnCount[1]);
 	server_print("=== Random Spawn Point");
 	server_print("= Spawn Count Is %d", g_spawnCount);
 	server_print("= Has Angles Point %d", haveAnglesPoint);
@@ -855,12 +867,7 @@ public fw_PlayerKilled(victim, attacker, shouldgib)
 	m_killMSGIndex[victim][1] = 0;
 	m_showKillMSGTime[victim] = gameTime + g_spawnTime;
 	m_showHudMsgTime[victim] = gameTime;
-	
-	m_deadSeePlayer[victim] = attacker;
-	m_deadSeePlayerTime[victim][0] = gameTime + 0.7;
-	m_deadSeePlayerTime[victim][1] = gameTime + g_deadSeePlayerTime;
-	m_deadSeePlayerTime[victim][2] = gameTime + 0.2;
-	
+		
 	m_killMSGIndex[attacker][0] = victim;
 	m_killMSGIndex[attacker][1] = 1;
 	m_showKillMSGTime[attacker] = gameTime + 4.0;
@@ -877,13 +884,26 @@ public fw_PlayerKilled(victim, attacker, shouldgib)
 			set_pev(attacker, pev_frags, float(pev(attacker, pev_frags)-1));
 
 		SendDeathMsg(attacker, victim, "worldspawn", 1);
+
+		m_deadSeeKiller[victim] = -1;
+		m_deadSeeKillerTime[victim][0] = gameTime + 0.1;
+		m_deadSeeKillerTime[victim][1] = gameTime + 0.1;
+		m_deadSeeKillerTime[victim][2] = gameTime + 0.1;
+
 		return HAM_SUPERCEDE;
 	}
-	
-	weapon = get_user_weapon(attacker);
+
+	m_deadSeeKiller[victim] = attacker;
+	m_deadSeeKillerTime[victim][0] = gameTime + 0.7;
+	m_deadSeeKillerTime[victim][1] = gameTime + g_deadSeeKillerTime;
+	m_deadSeeKillerTime[victim][2] = gameTime + 0.2;
 
 	set_pev(attacker, pev_frags, float(pev(attacker, pev_frags)+1));
-	SendDeathMsg(attacker, victim, weapon_msgname[weapon], (hitzone == 1) ? 1 : 0);
+
+	if (weapon == 4)
+		SendDeathMsg(attacker, victim, "grenade", 0);
+	else
+		SendDeathMsg(attacker, victim, weapon_msgname[weapon], (hitzone == 1) ? 1 : 0);
 
 	m_player_kill[attacker] += 1;
 	
@@ -1061,16 +1081,16 @@ public fw_PlayerPreThink (id)
 			fm_set_user_velocity (id, normalize);
 		}
 		
-		if (m_deadSeePlayerTime[id][2] <= gameTime-0.1 && !is_user_bot (id))
+		if (m_deadSeeKillerTime[id][2] <= gameTime-0.1 && !is_user_bot (id))
 		{
-			if (m_deadSeePlayer[id] != -1 && is_user_connected (m_deadSeePlayer[id]))
+			if (m_deadSeeKiller[id] != -1 && is_user_connected (m_deadSeeKiller[id]))
 			{
 				set_pev(id, pev_iuser1, 2);
-				set_pev(id, pev_iuser2, m_deadSeePlayer[id]);
-				set_pev(id, pev_iuser3, m_deadSeePlayer[id]);
+				set_pev(id, pev_iuser2, m_deadSeeKiller[id]);
+				set_pev(id, pev_iuser3, m_deadSeeKiller[id]);
 				
-				if (!is_user_alive (m_deadSeePlayer[id]))
-					m_deadSeePlayerTime[id][1] = m_deadSeePlayerTime[id][0] + 0.1;
+				if (!is_user_alive (m_deadSeeKiller[id]))
+					m_deadSeeKillerTime[id][1] = m_deadSeeKillerTime[id][0] + 0.1;
 			}
 		}
 	}
@@ -1085,11 +1105,11 @@ public fw_PlayerPreThink (id)
 	{
 		m_spawnMaxTime[id] = -1.0;
 		
-		if (m_deadSeePlayer[id] == -1)
+		if (m_deadSeeKiller[id] == -1)
 		{
-			m_deadSeePlayerTime[id][0] = -1.0;
-			m_deadSeePlayerTime[id][1] = -1.0;
-			m_deadSeePlayerTime[id][2] = -1.0;
+			m_deadSeeKillerTime[id][0] = -1.0;
+			m_deadSeeKillerTime[id][1] = -1.0;
+			m_deadSeeKillerTime[id][2] = -1.0;
 		}
 
 		if (!m_in_buyzone[id] || !g_buyZoneAddHp)
@@ -1173,13 +1193,13 @@ public fw_UpdateClientData(id, sendweapons, cd_handle)
 	new Float:gameTime = get_gametime ();
 	if (!m_delayPutinGame[id])
 	{
-		if (m_deadSeePlayerTime[id][1] == -1.0)
+		if (m_deadSeeKillerTime[id][1] == -1.0)
 			return FMRES_IGNORED;
 				
-		if (m_deadSeePlayerTime[id][1] > gameTime && m_deadSeePlayerTime[id][0] < gameTime)
+		if (m_deadSeeKillerTime[id][1] > gameTime && m_deadSeeKillerTime[id][0] < gameTime)
 			return FMRES_IGNORED;
 			
-		if (m_deadSeePlayerTime[id][2] > gameTime)
+		if (m_deadSeeKillerTime[id][2] > gameTime)
 			return FMRES_IGNORED;
 	}
 	
@@ -1486,7 +1506,7 @@ public dm_user_spawn(id)
 	set_msg_block(get_user_msgid("HideWeapon"), BLOCK_SET);
 	set_msg_block(get_user_msgid("RoundTime"), BLOCK_SET);
 	set_task(0.05, "event_hud_reset", id);
-	m_deadSeePlayer[id] = -1;
+	m_deadSeeKiller[id] = -1;
 	m_setDeadFlagTime[id] = -1.0;
 	
 	if (m_chosen_sec_weap[id] && m_sec_weaponid[id] != 0)
@@ -1567,7 +1587,6 @@ public RoundCountDown ()
 
 	if (g_makeNewBaseSpawn)
 	{
-		//client_print(0, print_center,"Auto Add to 16 SpawnPoint, Restart on %d's", countDownTime);
 		client_print(0, print_center,"%L", LANG_PLAYER, "RELOAD_SPAWNPOINT", countDownTime);
 		return;
 	}
@@ -1588,7 +1607,7 @@ public RoundCountDown ()
 			set_msg_block(get_user_msgid("RoundTime"), BLOCK_SET);
 			set_task(0.05, "event_hud_reset", id);
 			m_setDeadFlagTime[id] = -1.0;
-			m_deadSeePlayer[id] = -1;
+			m_deadSeeKiller[id] = -1;
 
 			dm_setSpawnPoint (id);
 			m_spawnGodTime[id] = gameTime + 2.5;
@@ -1910,12 +1929,12 @@ public playerDataReset (id, newRound)
 	m_chosen_pri_weap[id] = false;
 	m_chosen_sec_weap[id] = false;
 		
-	m_deadSeePlayer[id] = -1;
+	m_deadSeeKiller[id] = -1;
 	m_dmdamage[id] = false;
 	
-	m_deadSeePlayerTime[id][0] = -1.0;
-	m_deadSeePlayerTime[id][1] = -1.0;
-	m_deadSeePlayerTime[id][2] = -1.0;
+	m_deadSeeKillerTime[id][0] = -1.0;
+	m_deadSeeKillerTime[id][1] = -1.0;
+	m_deadSeeKillerTime[id][2] = -1.0;
 	m_showKillMSGTime[id] = -1.0;
 	m_setDeadFlagTime[id] = -1.0;
 	m_spawnTime[id] = -1.0;
