@@ -15,7 +15,7 @@
 #include <hamsandwich>
 
 #define PLUGIN	"Deathmatch: Kill Duty"
-#define VERSION	"3.3.0.9"
+#define VERSION	"3.3.0.10"
 #define AUTHOR	"HsK-Dev Blog By CCN"
 
 new const MAX_BPAMMO[] = { -1, 52, -1, 90, 1, 32, 1, 100, 90, 1, 120, 100, 100, 90, 90, 90, 100, 120,
@@ -653,11 +653,11 @@ public DM_BaseGameSetting()
 	if (g_gameMaxTime < 5)
 		g_gameMaxTime = 5;
 	
-	server_cmd("mp_timelimit 0");
-	server_cmd("mp_freezetime %d", g_startTimeData);
-	server_cmd("mp_friendlyfire %d", g_dmMode);
-	server_cmd("mp_scoreboard_showmoney 0");
-	server_cmd("mp_scoreboard_showhealth %s", (g_dmMode == MODE_TDM) ? "3" : "0");
+	server_cmd_and_check("mp_timelimit", 0);
+	server_cmd_and_check("mp_freezetime", g_startTimeData);
+	server_cmd_and_check("mp_friendlyfire", g_dmMode);
+	server_cmd_and_check("mp_scoreboard_showmoney", 0);
+	server_cmd_and_check("mp_scoreboard_showhealth", (g_dmMode == MODE_TDM) ? 3 : 0);
 
 	g_dm_roundStart = false;
 	g_dm_roundEnd = false;
@@ -1561,21 +1561,29 @@ public SetBotMode (gamePlay)
 {
 	if (!gamePlay)
 	{
-		server_cmd("sypb_gamemod 3");
-		server_cmd("ebot_gamemod 3");
-		server_cmd("yb_ignore_enemies 1");
+		server_cmd_and_check("sypb_gamemod", 3);
+		server_cmd_and_check("ebot_gamemod", 3);
+		server_cmd_and_check("yb_ignore_enemies", 1);
 		
 		return;
 	}
 
-	server_cmd("sypb_gamemod %d", g_dmMode);
-	server_cmd("ebot_gamemod %d", g_dmMode);
-	server_cmd("yb_ignore_enemies 0");
+	server_cmd_and_check("sypb_gamemod", g_dmMode);
+	server_cmd_and_check("ebot_gamemod", g_dmMode);
+	server_cmd_and_check("yb_ignore_enemies", 0);
 	
 	if (g_dmMode == MODE_DM) 
-		server_cmd("yb_csdm_mode 2");
+		server_cmd_and_check("yb_csdm_mode", 2);
 	else
-		server_cmd("yb_csdm_mode 1");
+		server_cmd_and_check("yb_csdm_mode", 1);
+}
+
+public server_cmd_and_check (const command[], num)
+{
+	if (!cvar_exists (command))
+		return;
+
+	server_cmd("%s %d", command, num);
 }
 
 public RoundCountDown ()
