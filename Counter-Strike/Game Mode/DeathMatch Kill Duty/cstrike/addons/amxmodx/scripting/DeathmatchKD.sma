@@ -1,7 +1,7 @@
 
 /* 
 			DeathMatch: Kill Duty 3.3.0
-				6/4/2023 (Version: 3.3.0)
+				10/4/2023 (Version: 3.3.0)
 			
 					HsK-Dev Blog By CCN
 			
@@ -15,7 +15,7 @@
 #include <hamsandwich>
 
 #define PLUGIN	"Deathmatch: Kill Duty"
-#define VERSION	"3.3.0.10"
+#define VERSION	"3.3.0.11"
 #define AUTHOR	"HsK-Dev Blog By CCN"
 
 new const MAX_BPAMMO[] = { -1, 52, -1, 90, 1, 32, 1, 100, 90, 1, 120, 100, 100, 90, 90, 90, 100, 120,
@@ -886,17 +886,17 @@ public fw_PlayerKilled(victim, attacker, shouldgib)
 		SendDeathMsg(attacker, victim, "worldspawn", 1);
 
 		m_deadSeeKiller[victim] = -1;
-		m_deadSeeKillerTime[victim][0] = gameTime + 0.1;
-		m_deadSeeKillerTime[victim][1] = gameTime + 0.1;
-		m_deadSeeKillerTime[victim][2] = gameTime + 0.1;
+		m_deadSeeKillerTime[victim][0] = gameTime;
+		m_deadSeeKillerTime[victim][1] = gameTime;
+		m_deadSeeKillerTime[victim][2] = gameTime;
 
 		return HAM_SUPERCEDE;
 	}
 
 	m_deadSeeKiller[victim] = attacker;
-	m_deadSeeKillerTime[victim][0] = gameTime + 0.7;
+	m_deadSeeKillerTime[victim][0] = gameTime + 0.5;
 	m_deadSeeKillerTime[victim][1] = gameTime + g_deadSeeKillerTime;
-	m_deadSeeKillerTime[victim][2] = gameTime + 0.2;
+	m_deadSeeKillerTime[victim][2] = gameTime + 0.1;
 
 	set_pev(attacker, pev_frags, float(pev(attacker, pev_frags)+1));
 
@@ -1081,7 +1081,7 @@ public fw_PlayerPreThink (id)
 			fm_set_user_velocity (id, normalize);
 		}
 		
-		if (m_deadSeeKillerTime[id][2] <= gameTime-0.1 && !is_user_bot (id))
+		if (m_deadSeeKillerTime[id][2] <= gameTime && !is_user_bot (id))
 		{
 			if (m_deadSeeKiller[id] != -1 && is_user_connected (m_deadSeeKiller[id]))
 			{
@@ -1090,7 +1090,7 @@ public fw_PlayerPreThink (id)
 				set_pev(id, pev_iuser3, m_deadSeeKiller[id]);
 				
 				if (!is_user_alive (m_deadSeeKiller[id]))
-					m_deadSeeKillerTime[id][1] = m_deadSeeKillerTime[id][0] + 0.1;
+					m_deadSeeKillerTime[id][1] = m_deadSeeKillerTime[id][0];
 			}
 		}
 	}
