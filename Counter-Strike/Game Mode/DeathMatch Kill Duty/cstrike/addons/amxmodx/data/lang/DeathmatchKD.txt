@@ -36,7 +36,7 @@ MENU_EXIT = Exit
 
 COUNTDOWN_MSG = %d 's will strat game!
 CHANGEMAP_TIME = %d 's will Change the Map
-RELOAD_SPAWNPOINT = Auto Add to 16 SpawnPoint, Restart on %d 's
+RELOAD_SPAWNPOINT = Auto Add Base Spawn Point, Restart on %d 's
 
 TDM_KILLER_MSG = You Kill Player '%s', Your kill '%d' player
 DM_KILLER_MSG = You Kill Player '%s', Your kill '%d/%d' player
@@ -92,7 +92,7 @@ MENU_EXIT = 離開
 
 COUNTDOWN_MSG = 遊戲在 %d 秒後開始
 CHANGEMAP_TIME = %d 's will Change the Map
-RELOAD_SPAWNPOINT = Auto Add to 16 SpawnPoint, Restart on %d 's
+RELOAD_SPAWNPOINT =  Auto Add Base Spawn Point, Restart on %d 's
 
 TDM_KILLER_MSG = 你擊殺了玩家 '%s', 你共擊殺了 '%d' 位玩家
 DM_KILLER_MSG = 你擊殺了玩家 '%s', 你共擊殺了 '%d/%d' 位玩家

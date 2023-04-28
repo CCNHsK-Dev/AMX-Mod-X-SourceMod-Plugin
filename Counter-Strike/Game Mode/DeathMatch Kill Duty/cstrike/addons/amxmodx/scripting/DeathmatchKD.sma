@@ -1,7 +1,7 @@
 
 /* 
 			DeathMatch: Kill Duty 3.3.0
-				10/4/2023 (Version: 3.3.0)
+				29/4/2023 (Version: 3.3.0)
 			
 					HsK-Dev Blog By CCN
 			
@@ -15,7 +15,7 @@
 #include <hamsandwich>
 
 #define PLUGIN	"Deathmatch: Kill Duty"
-#define VERSION	"3.3.0.11"
+#define VERSION	"3.3.0.12"
 #define AUTHOR	"HsK-Dev Blog By CCN"
 
 new const MAX_BPAMMO[] = { -1, 52, -1, 90, 1, 32, 1, 100, 90, 1, 120, 100, 100, 90, 90, 90, 100, 120,
@@ -531,6 +531,9 @@ stock LoadSpawnPoint()
 		g_dmMode = MODE_TDM;
 		g_dm_randomSpawn = false;
 	}
+
+	if (g_makeNewBaseSpawn)
+		server_cmd_and_check("sv_restart", 1);
 }
 
 public addBaseSpawnPoint (basePointCount, team, const classname[])
@@ -556,6 +559,31 @@ public addBaseSpawnPoint (basePointCount, team, const classname[])
 			if (get_tr2(0, TR_StartSolid) || get_tr2(0, TR_AllSolid) || !get_tr2(0, TR_InOpen))
 				continue;
 		}
+
+		new Float:checkOrigin[3];
+		checkOrigin = origin;
+		checkOrigin[2] -= 200;
+		engfunc(EngFunc_TraceLine, origin, checkOrigin, IGNORE_GLASS, -1, 0);
+		get_tr2(0, TR_vecEndPos, checkOrigin);
+		if (get_distance_f(origin, checkOrigin) >= 100.0)
+			continue;
+
+		new entity2, badSpawnPoint = 0;
+		while ((entity2 = engfunc(EngFunc_FindEntityByString, entity2, "classname", classname)))
+		{
+			if (entity2 == entity)
+				continue;
+
+			pev(entity2, pev_origin, checkOrigin);
+			if (get_distance_f(origin, checkOrigin) < 80.0)
+			{
+				badSpawnPoint = 1;
+				break;
+			}
+		}
+
+		if (badSpawnPoint == 1)
+			continue;
 
 		new newspawnPoint = engfunc(EngFunc_CreateNamedEntity,engfunc(EngFunc_AllocString,classname));
 		set_pev(newspawnPoint,pev_classname, classname);
@@ -704,7 +732,7 @@ public event_round_start()
 	DM_BaseGameSetting ();
 
 	if (g_makeNewBaseSpawn)
-		g_startTimeData = 6;
+		g_startTimeData = 8;
 	
 	g_startTime = g_startTimeData + floatround(get_gametime ());
 	g_secondThinkTime = get_gametime ();
