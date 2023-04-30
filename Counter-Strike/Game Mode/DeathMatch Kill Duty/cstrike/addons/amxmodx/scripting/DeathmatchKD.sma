@@ -1,7 +1,7 @@
 
 /* 
 			DeathMatch: Kill Duty 3.3.0
-				30/4/2023 (Version: 3.3.0)
+				1/5/2023 (Version: 3.3.0)
 			
 					HsK-Dev Blog By CCN
 			
@@ -15,7 +15,7 @@
 #include <hamsandwich>
 
 #define PLUGIN	"Deathmatch: Kill Duty"
-#define VERSION	"3.3.0.14"
+#define VERSION	"3.3.0.15"
 #define AUTHOR	"HsK-Dev Blog By CCN"
 
 new const MAX_BPAMMO[] = { -1, 52, -1, 90, 1, 32, 1, 100, 90, 1, 120, 100, 100, 90, 90, 90, 100, 120,
@@ -83,7 +83,7 @@ new g_gameMaxTime; // DM End Time (Min)
 new g_maxKill; // Max Kill
 new g_ggKillCount[30]; // Gun Game
 new g_CT_kill, g_TR_kill; // CT and TR Kill [tdm]
-new g_gg_CTKill, g_gg_TRKill, g_gg_CTLevel, g_gg_TRLevel; // Gun Game
+new g_gg_CTKill, g_gg_TRKill, g_gg_CTLevel, g_gg_TRLevel; // GunGame Level
 new g_topKiller[2]; // Top Killer [0=ID/1=Kill Num]
 new g_winIndex; // Win Team / Player Id
 new g_maxKillData[2]; // Load Max Kill Data
@@ -109,6 +109,7 @@ new bool:g_blockSuicide; // Block player Suicide
 
 new bool:g_unlimitAmmo; // Unlimited Ammo(Magazine)
 new bool:g_giveGrenade[3]; // Give Grenade
+new bool:g_gg_hasKnife; // GunGame Knife
 
 new g_startTimeData, g_startTime; // Game Start Time (Freeze Time)
 new g_fwSpawn; // Spawn and forward handles
@@ -126,7 +127,7 @@ new g_ggweaponCount, g_ggweaponID[30], g_ggweaponKP[30], g_ggweaponName[30][64];
 new m_delayPutinGame[33]; // Player Join the Game
 new m_in_buyzone[33]; // Is Buy Zone
 new m_player_kill[33]; // Player Kill
-new m_gg_kill[33], m_gg_level[33]; // Gun Game
+new m_gg_kill[33], m_gg_level[33]; // GunGame Level
 new m_killMSGIndex[33][2]; // For kill MSG
 
 new bool:m_chosen_pri_weap[33]; // Is Pri Weap set
@@ -239,6 +240,7 @@ LoadDMKDSetting ()
 	g_giveGrenade[0] = false;
 	g_giveGrenade[1] = false;
 	g_giveGrenade[2] = false;
+	g_gg_hasKnife = false;
 	g_startTimeData = 10;
 	g_maxKill = 0;
 	g_maxKillData[MODE_TDM] = 0;
@@ -288,13 +290,19 @@ LoadDMKDSetting ()
 			ggKillPercentage -= g_ggweaponKP[i];
 			if (ggKillPercentage < 0)
 			{
+				server_print ("[DM:KD] Log: GunGame Weapon Setting '>100', Higt Level %d Change to %d", 
+				g_ggweaponCount, i);
 				g_ggweaponCount = i;
 				break;
 			}
 		}
 
 		if (ggKillPercentage > 0)
+		{
+			server_print ("[DM:KD] Log: GunGame Weapon Setting '<100', Level 1 Kill Percentage %d Change to %d", 
+				g_ggweaponKP[0], g_ggweaponKP[0]+ggKillPercentage);
 			g_ggweaponKP[0] += ggKillPercentage;
+		}
 	}
 
 	GetGameMap();
@@ -380,6 +388,8 @@ LoadDMSettingFile()
 						i++;
 					}
 				}
+				else if (equal(key, "GunGame Has Knife")) g_gg_hasKnife = str_to_bool(value);
+
 				else if (equal(key, "Buyzone Add HP")) g_buyZoneAddHp = str_to_bool(value);
 				else if (equal(key, "Buyzone Add HP Time")) g_buyZoneAddHpTime = str_to_float(value);
 				else if (equal(key, "Buyzone Add HP Amount")) g_buyZoneAddHpAmounT = str_to_num(value);
@@ -830,10 +840,19 @@ public logevent_round_start()
 	if (g_gunGame)
 	{
 		new modAdd = -1;
+		new totalKillCount = 0;
 
 		for (new i = 0; i < g_ggweaponCount; i++)
 		{
 			g_ggKillCount[i] = (g_maxKill*g_ggweaponKP[i])/100;
+			totalKillCount += g_ggKillCount[i];
+			if (g_ggKillCount[i] == 0)
+			{
+				g_ggKillCount[i]++;
+				totalKillCount++;
+				continue;
+			}
+
 			if ((g_maxKill*g_ggweaponKP[i])%100 == 0)
 				continue;
 			
@@ -842,9 +861,13 @@ public logevent_round_start()
 			else
 			{
 				g_ggKillCount[modAdd]++;
+				totalKillCount++;
 				modAdd = -1;
 			}
 		}
+
+		if (totalKillCount > g_maxKill)
+			g_maxKill = totalKillCount;
 	}
 
 	if (g_maxKill == -1)
@@ -1070,69 +1093,6 @@ public fw_PlayerKilled(victim, attacker, shouldgib)
 	CheckGunGameLevelUP ();
 
 	return HAM_SUPERCEDE;
-}
-
-public CheckGunGameLevelUP ()
-{
-	if (!dm_game_play() || !g_gunGame)
-		return;
-
-	if (g_dmMode == MODE_TDM)
-	{
-		new CTNeedKillCount = g_ggKillCount[g_gg_CTLevel];
-		new TRNeedKillCount = g_ggKillCount[g_gg_TRLevel];
-		if (g_gg_CTKill >= CTNeedKillCount && g_gg_CTLevel < g_ggweaponCount)
-		{
-			g_gg_CTKill = 0;
-			g_gg_CTLevel++;
-
-			for (new id = 1; id <= get_maxplayers(); id++)
-			{
-				if (!is_user_connected (id) || !is_user_alive (id) || fm_get_user_team (id) != 2)
-					continue;
-					
-				dm_user_spawn (id);
-				client_cmd(id, "spk ^"events/tutor_msg.wav^"");
-			}
-		}
-
-		if (g_gg_TRKill >= TRNeedKillCount && g_gg_TRLevel < g_ggweaponCount)
-		{
-			g_gg_TRKill = 0;
-			g_gg_TRLevel++;
-
-			for (new id = 1; id <= get_maxplayers(); id++)
-			{
-				if (!is_user_connected (id) || !is_user_alive (id) || fm_get_user_team (id) != 1)
-					continue;
-					
-				dm_user_spawn (id);
-				client_cmd(id, "spk ^"events/tutor_msg.wav^"");
-			}
-		}
-
-		return;
-	}
-
-	for (new id = 1; id <= get_maxplayers(); id++)
-	{
-		if (!is_user_connected (id))
-			continue;
-
-		if (m_gg_level[id] >= g_ggweaponCount-1)
-			continue;
-					
-		if (m_gg_kill[id] < g_ggKillCount[m_gg_level[id]])
-			continue;
-
-		m_gg_level[id]++;
-		m_gg_kill[id] = 0;
-
-		if (is_user_alive(id))
-			dm_user_spawn (id);
-
-		client_cmd(id, "spk ^"events/tutor_msg.wav^"");
-	}
 }
 
 public fw_TakeDamage(victim, inflictor, attacker, Float:damage, damage_type)
@@ -1748,6 +1708,9 @@ public dm_user_spawn(id)
 
 	if (g_gunGame)
 	{
+		if (g_gg_hasKnife)
+			fm_give_item(id, "weapon_knife");
+
 		new weaponid;
 		if (g_dmMode == MODE_TDM)
 		{
@@ -1936,6 +1899,8 @@ public dm_setSpawnPoint (id)
 
 public dm_DeathAction (id, hitzone, Float: gameTime)
 {
+	set_pev(id, pev_fov, 90);
+
 	m_spawnTime[id] = gameTime + g_spawnTime;	
 	m_setDeadFlagTime[id] = gameTime;
 	
@@ -1953,7 +1918,6 @@ public dm_DeathAction (id, hitzone, Float: gameTime)
 		message_end();
 		
 		set_pev(id, pev_body, 0);
-		
 	}
 
 	drop_weapons(id, 0);
@@ -2038,6 +2002,69 @@ public dm_buyzone_addhp(id)
 		fm_set_user_health(id, set_health);
 
 		client_print(id, print_chat, "%L", id, "ADD_HP_IN_BZN", g_buyZoneAddHpTime, set_health - health);
+	}
+}
+
+public CheckGunGameLevelUP ()
+{
+	if (!dm_game_play() || !g_gunGame)
+		return;
+
+	if (g_dmMode == MODE_TDM)
+	{
+		new CTNeedKillCount = g_ggKillCount[g_gg_CTLevel];
+		new TRNeedKillCount = g_ggKillCount[g_gg_TRLevel];
+		if (g_gg_CTKill >= CTNeedKillCount && g_gg_CTLevel < g_ggweaponCount)
+		{
+			g_gg_CTKill = 0;
+			g_gg_CTLevel++;
+
+			for (new id = 1; id <= get_maxplayers(); id++)
+			{
+				if (!is_user_connected (id) || !is_user_alive (id) || fm_get_user_team (id) != 2)
+					continue;
+					
+				dm_user_spawn (id);
+				client_cmd(id, "spk ^"events/friend_died.wav^"");
+			}
+		}
+
+		if (g_gg_TRKill >= TRNeedKillCount && g_gg_TRLevel < g_ggweaponCount)
+		{
+			g_gg_TRKill = 0;
+			g_gg_TRLevel++;
+
+			for (new id = 1; id <= get_maxplayers(); id++)
+			{
+				if (!is_user_connected (id) || !is_user_alive (id) || fm_get_user_team (id) != 1)
+					continue;
+					
+				dm_user_spawn (id);
+				client_cmd(id, "spk ^"events/friend_died.wav^"");
+			}
+		}
+
+		return;
+	}
+
+	for (new id = 1; id <= get_maxplayers(); id++)
+	{
+		if (!is_user_connected (id))
+			continue;
+
+		if (m_gg_level[id] >= g_ggweaponCount-1)
+			continue;
+					
+		if (m_gg_kill[id] < g_ggKillCount[m_gg_level[id]])
+			continue;
+
+		m_gg_level[id]++;
+		m_gg_kill[id] = 0;
+
+		if (is_user_alive(id))
+			dm_user_spawn (id);
+
+		client_cmd(id, "spk ^"events/friend_died.wav^"");
 	}
 }
 // ====================
