@@ -15,7 +15,7 @@
 #include <hamsandwich>
 
 #define PLUGIN	"Deathmatch: Kill Duty"
-#define VERSION	"3.3.0.13"
+#define VERSION	"3.3.0.14"
 #define AUTHOR	"HsK-Dev Blog By CCN"
 
 new const MAX_BPAMMO[] = { -1, 52, -1, 90, 1, 32, 1, 100, 90, 1, 120, 100, 100, 90, 90, 90, 100, 120,
@@ -81,6 +81,7 @@ new Float:g_secondThinkTime; // Second Think
 
 new g_gameMaxTime; // DM End Time (Min)
 new g_maxKill; // Max Kill
+new g_ggKillCount[30]; // Gun Game
 new g_CT_kill, g_TR_kill; // CT and TR Kill [tdm]
 new g_gg_CTKill, g_gg_TRKill, g_gg_CTLevel, g_gg_TRLevel; // Gun Game
 new g_topKiller[2]; // Top Killer [0=ID/1=Kill Num]
@@ -119,7 +120,7 @@ new g_dmModeKillerAddHP, g_dmModeKillerAddHPHS, g_dmModeKillerAddHPKN; // Kill E
 new g_priweapon, g_secweapon, g_priweaponID[30], g_secweaponID[30], 
 g_priweaponName[30][64], g_secweaponName[30][64];
 new g_botBestWeapon[2][3];  // Bot Nice Weapon (AK/M4...)
-new g_ggweaponCount, g_ggweaponID[30], g_ggweaponKP[30];
+new g_ggweaponCount, g_ggweaponID[30], g_ggweaponKP[30], g_ggweaponName[30][64];
 
 // Player vars
 new m_delayPutinGame[33]; // Player Join the Game
@@ -184,6 +185,7 @@ public plugin_init()
 	register_clcmd("buyammo2", "clcmd_buy");
 	register_clcmd("chooseteam", "clcmd_changeteam");
 	register_clcmd("jointeam", "clcmd_changeteam");
+	register_clcmd("drop", "clcmd_drop");
 	register_clcmd("say dm_set", "dm_adminSettingMenu");
 	register_clcmd("say /dm_set", "dm_adminSettingMenu");
 
@@ -283,7 +285,7 @@ LoadDMKDSetting ()
 		new ggKillPercentage = 100;
 		for (new i = 0; i < g_ggweaponCount; i++)
 		{
-			ggKillPercentage -= g_ggweaponKP[g_ggweaponCount];
+			ggKillPercentage -= g_ggweaponKP[i];
 			if (ggKillPercentage < 0)
 			{
 				g_ggweaponCount = i;
@@ -291,8 +293,8 @@ LoadDMKDSetting ()
 			}
 		}
 
-		//if (ggKillPercentage > 0)
-		//	g_ggweaponKP[0] += ggKillPercentage;
+		if (ggKillPercentage > 0)
+			g_ggweaponKP[0] += ggKillPercentage;
 	}
 
 	GetGameMap();
@@ -416,10 +418,12 @@ LoadDMSettingFile()
 			}
 			case 4:
 			{
-				new weaponid[255], value[4];
+				new weaponid[255], weaponName[64], weaponKP[4], value[255];
 				strtok(linedata, weaponid, charsmax(weaponid), value, charsmax(value), ',');
+				strtok(value, weaponName, charsmax(weaponName), weaponKP, charsmax(weaponKP), ',');
 				g_ggweaponID[g_ggweaponCount] = get_user_weapon_id(weaponid);
-				g_ggweaponKP[g_ggweaponCount] = str_to_num(value);
+				g_ggweaponName[g_ggweaponCount] = weaponName;
+				g_ggweaponKP[g_ggweaponCount] = str_to_num(weaponKP);
 				g_ggweaponCount++;
 			}
 		}
@@ -450,9 +454,9 @@ public SaveSpawnPoint(id)
 
 	server_print("==========================");
 	server_print("= [Deathmatch: Kill Duty]     ");
-	server_print("= Save New Spawns");
+	server_print("= Save New Spawn Point");
 	server_print("==========================");
-	client_print(id, print_chat, "New Spawn : %f %f %f", origin[0], origin[1], origin[2]);
+	client_print(id, print_chat, "New Spawn Point : %.2f %.2f %.2f", origin[0], origin[1], origin[2]);
 }
 
 stock LoadBasePoint()
@@ -473,7 +477,7 @@ stock LoadBasePoint()
 
 			if(!linedata[0] || str_count(linedata,' ') < 2) continue;
 
-			parse(linedata,data[0],5,data[1],5,data[2],5,data[3],5,data[4],5,data[5],5, data[6],5);
+			parse(linedata,data[0],5,data[1],5,data[2],5,data[3],5,data[4],5,data[5],5,data[6],5);
 			new Float: origin[3], Float: angles[3];
 			origin[0] = str_to_float(data[1]);
 			origin[1] = str_to_float(data[2]);
@@ -506,7 +510,6 @@ stock LoadBasePoint()
 stock LoadSpawnPoint()
 {
 	g_spawnCount = 0;
-	new haveAnglesPoint = 0;
 
 	new cfgdir[32], mapname[32], filepath[100], linedata[64];
 	get_configsdir(cfgdir, charsmax(cfgdir));
@@ -533,9 +536,6 @@ stock LoadSpawnPoint()
 			g_spawnAngles[g_spawnCount][1] = str_to_float(data[4]);
 			g_spawnAngles[g_spawnCount][2] = str_to_float(data[5]);
 			
-			if (g_spawnAngles[g_spawnCount][0] != 0.0 && g_spawnAngles[g_spawnCount][1] != 0.0)
-				haveAnglesPoint++;
-			
 			g_spawnCount++;
 			if (g_spawnCount >= sizeof g_spawnPoint)
 				break;
@@ -561,12 +561,10 @@ stock LoadSpawnPoint()
 	server_print("==========================");
 	server_print("= [Deathmatch: Kill Duty]     ");
 	server_print("= MAP : %s", mapname);
-	server_print("= Load Spawns.....");
+	server_print("= Load Spawn Point.....");
 	server_print("= Base CT Point: %d | TR Point: %d", ctSpawnPoint, trSpawnPoint);
 	server_print("= New  CT Point: %d | TR Point: %d", g_newBaseSpawnCount[0], g_newBaseSpawnCount[1]);
-	server_print("=== Random Spawn Point");
-	server_print("= Spawn Count Is %d", g_spawnCount);
-	server_print("= Has Angles Point %d", haveAnglesPoint);
+	server_print("= Spawn Count Has %d", g_spawnCount);
 	server_print("==========================");
 	
 	if (g_spawnCount == 0)
@@ -829,6 +827,26 @@ public logevent_round_start()
 		g_maxKill = maxKill;
 	}
 
+	if (g_gunGame)
+	{
+		new modAdd = -1;
+
+		for (new i = 0; i < g_ggweaponCount; i++)
+		{
+			g_ggKillCount[i] = (g_maxKill*g_ggweaponKP[i])/100;
+			if ((g_maxKill*g_ggweaponKP[i])%100 == 0)
+				continue;
+			
+			if (modAdd == -1)
+				modAdd = i;
+			else
+			{
+				g_ggKillCount[modAdd]++;
+				modAdd = -1;
+			}
+		}
+	}
+
 	if (g_maxKill == -1)
 		client_print(0, print_center, "%L", LANG_PLAYER, "GS_TIMEONLY_MSG", g_maxKill);
 	else
@@ -854,9 +872,12 @@ public dm_showHudMsg(id)
 	if (!g_dm_roundStart)
 	{
 		if (g_dmMode == MODE_TDM)
-			msgPart += formatex(hudMsg[msgPart], sizeof hudMsg -1 - msgPart, "^n^n%L^n^n", id, "TDM_KILL_MSG_READY");
+			msgPart += formatex(hudMsg[msgPart], sizeof hudMsg -1 - msgPart, "^n^n%L^n", id, "TDM_KILL_MSG_READY");
 		else
-			msgPart += formatex(hudMsg[msgPart], sizeof hudMsg -1 - msgPart, "^n^n %L^n^n", id, "DM_KILL_MSG_READY");
+			msgPart += formatex(hudMsg[msgPart], sizeof hudMsg -1 - msgPart, "^n^n%L^n", id, "DM_KILL_MSG_READY");
+
+		if (g_gunGame)
+			msgPart += formatex(hudMsg[msgPart], sizeof hudMsg -1 - msgPart, "%L^n^n", id, "GUNGAME_MSG_READY");
 	}
 	else
 	{
@@ -867,10 +888,23 @@ public dm_showHudMsg(id)
 			msgPart += formatex(hudMsg[msgPart], sizeof hudMsg -1 - msgPart, "%L^n", id, "MAX_KILL_MSG", g_maxKill);
 		
 		if (g_dmMode == MODE_TDM)
-			msgPart += formatex(hudMsg[msgPart], sizeof hudMsg -1 - msgPart, "%L^n^n", id, "TDM_KILL_MSG", g_CT_kill, g_TR_kill);
+		{
+			msgPart += formatex(hudMsg[msgPart], sizeof hudMsg -1 - msgPart, "%L^n", id, "TDM_KILL_MSG", g_CT_kill, g_TR_kill);
+			if (g_gunGame)
+				msgPart += formatex(hudMsg[msgPart], sizeof hudMsg -1 - msgPart, "%L^n", id, "DM_GUNGAME_MSG", 
+				((fm_get_user_team(id)==2) ? g_gg_CTLevel : g_gg_TRLevel)+1, g_ggweaponCount, 
+				(fm_get_user_team(id)==2) ? g_ggKillCount[g_gg_CTLevel]-g_gg_CTKill : g_ggKillCount[g_gg_TRLevel]-g_gg_TRKill);
+			else
+				msgPart += formatex(hudMsg[msgPart], sizeof hudMsg -1 - msgPart, "^n");
+		}
 		else
 		{
 			msgPart += formatex(hudMsg[msgPart], sizeof hudMsg -1 - msgPart, " %L^n", id, "DM_KILL_MSG", m_player_kill[id]);
+
+			if (g_gunGame)
+				msgPart += formatex(hudMsg[msgPart], sizeof hudMsg -1 - msgPart, "%L^n", id, "DM_GUNGAME_MSG", 
+				m_gg_level[id]+1, g_ggweaponCount, g_ggKillCount[m_gg_level[id]]-m_gg_kill[id]);
+
 			if (g_topKiller[0] != -1)
 			{
 				new playerName[32];
@@ -1045,8 +1079,8 @@ public CheckGunGameLevelUP ()
 
 	if (g_dmMode == MODE_TDM)
 	{
-		new CTNeedKillCount = (g_maxKill*g_ggweaponKP[g_gg_CTLevel])/100;
-		new TRNeedKillCount = (g_maxKill*g_ggweaponKP[g_gg_TRLevel])/100;
+		new CTNeedKillCount = g_ggKillCount[g_gg_CTLevel];
+		new TRNeedKillCount = g_ggKillCount[g_gg_TRLevel];
 		if (g_gg_CTKill >= CTNeedKillCount && g_gg_CTLevel < g_ggweaponCount)
 		{
 			g_gg_CTKill = 0;
@@ -1058,6 +1092,7 @@ public CheckGunGameLevelUP ()
 					continue;
 					
 				dm_user_spawn (id);
+				client_cmd(id, "spk ^"events/tutor_msg.wav^"");
 			}
 		}
 
@@ -1072,6 +1107,7 @@ public CheckGunGameLevelUP ()
 					continue;
 					
 				dm_user_spawn (id);
+				client_cmd(id, "spk ^"events/tutor_msg.wav^"");
 			}
 		}
 
@@ -1086,7 +1122,7 @@ public CheckGunGameLevelUP ()
 		if (m_gg_level[id] >= g_ggweaponCount-1)
 			continue;
 					
-		if (m_gg_kill[id] < (g_maxKill*g_ggweaponKP[m_gg_level[id]])/100)
+		if (m_gg_kill[id] < g_ggKillCount[m_gg_level[id]])
 			continue;
 
 		m_gg_level[id]++;
@@ -1094,6 +1130,8 @@ public CheckGunGameLevelUP ()
 
 		if (is_user_alive(id))
 			dm_user_spawn (id);
+
+		client_cmd(id, "spk ^"events/tutor_msg.wav^"");
 	}
 }
 
@@ -1435,22 +1473,28 @@ public dm_gungame_spawn(id)
 		return;
 	}
 
+	if (!m_delayPutinGame[id])
+	{
+		m_spawnMaxTime[id] = get_gametime () + g_spawnMaxTime;
+		client_print(id, print_center, "%L", id, "INEV_RES_MSG", g_spawnMaxTime);
+	}
+
 	static menu[250], len;
 	len = 0;
 
-	len += formatex(menu[len], sizeof menu - 1 - len, "\y Gun Game Test^n^n");
-	len += formatex(menu[len], sizeof menu - 1 - len, "\r1.\w Spawn Now ^n^n^n");
+	len += formatex(menu[len], sizeof menu - 1 - len, "\y %L^n^n", id, "GG_WM_MENU1");
+	len += formatex(menu[len], sizeof menu - 1 - len, "\r %L ^n^n^n", id, "GG_WM_MENU2");
 
 	if (g_dmMode == MODE_TDM)
 	{
 		new teamlevel = fm_get_user_team(id) == 2 ? g_gg_CTLevel : g_gg_TRLevel;
-		len += formatex(menu[len], sizeof menu - 1 - len, "\r Your Team Level: %d^n", teamlevel);
-		len += formatex(menu[len], sizeof menu - 1 - len, "\r Your Weapon: %s", WEAPON_CLASSNAME[g_ggweaponID[teamlevel]]);
+		len += formatex(menu[len], sizeof menu - 1 - len, "\r %L^n", id, "GG_WM_MENU3A", teamlevel+1, g_ggweaponCount);
+		len += formatex(menu[len], sizeof menu - 1 - len, "\r %L", id, "GG_WM_MENU4", g_ggweaponName[teamlevel]);
 	}
 	else
 	{
-		len += formatex(menu[len], sizeof menu - 1 - len, "\r Your Level: %d^n", m_gg_level[id]);
-		len += formatex(menu[len], sizeof menu - 1 - len, "\r Your Weapon: %s", WEAPON_CLASSNAME[g_ggweaponID[m_gg_level[id]]]);
+		len += formatex(menu[len], sizeof menu - 1 - len, "\r %L^n", id, "GG_WM_MENU3B", m_gg_level[id]+1, g_ggweaponCount);
+		len += formatex(menu[len], sizeof menu - 1 - len, "\r %L", id, "GG_WM_MENU4", g_ggweaponName[m_gg_level[id]]);
 	}
 
 	show_menu(id, KEYSMENU, menu, -1, "UsE WeapoN MeuN");
@@ -2180,6 +2224,14 @@ public clcmd_changeteam(id)
 	}
 
 	return PLUGIN_HANDLED;
+}
+
+public clcmd_drop(id)
+{
+	if (g_gunGame)
+		return PLUGIN_HANDLED;
+
+	return PLUGIN_CONTINUE;
 }
 
 public event_hud_reset(id)

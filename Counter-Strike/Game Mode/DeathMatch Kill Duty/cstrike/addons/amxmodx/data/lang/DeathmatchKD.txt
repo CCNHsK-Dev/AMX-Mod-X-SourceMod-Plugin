@@ -5,12 +5,15 @@ ROUNDTIME_MSG = ROUND TIME %d Min
 
 TDM_KILL_MSG_READY = Deathmatch: Kill Duty^nTeam Deathmatch Mode
 DM_KILL_MSG_READY = Deathmatch: Kill Duty^nDeathmatch Mode
+GUNGAME_MSG_READY = GunGame Mode
 
 MAX_KILL_MSG = /- Target %d -/
 TDM_KILL_MSG = CT %d | %d TR
 DM_KILL_MSG = Your Kill Count %d
 
 DM_TOPKILLER_MSG = Top Killer '%s' ^nKill '%d' Player
+
+DM_GUNGAME_MSG = GunGame Level:%d/%d Next Level Need Kill '%d'
 
 TR_WIN_MSG = !!TR Win!! ^n Next Map is [%s]
 CT_WIN_MSG = !!CT Win!! ^n Next Map is [%s]
@@ -29,6 +32,12 @@ AGET_WEAP_MENU4 = Your Last Time Weapon Is:
 
 PRI_WM_NAME = [DM:KD] Choose your Pri Weapon
 SEC_WM_NAME = [DM:KD] Choose your Sec Weapon
+
+GG_WM_MENU1 = [DM:KD] GunGame
+GG_WM_MENU2 = Any Number Button to Start
+GG_WM_MENU3A = Your Team Level: %d/%d
+GG_WM_MENU3B = Your Level: %d/%d
+GG_WM_MENU4 = This Level Weapon: %s
 
 MENU_BACK = Back
 MENU_NEXT = Next
@@ -61,12 +70,15 @@ ROUNDTIME_MSG = ROUND TIME %d Min
 
 TDM_KILL_MSG_READY = Deathmatch: Kill Duty^nTeam Deathmatch Mode
 DM_KILL_MSG_READY = Deathmatch: Kill Duty^nDeathmatch Mode
+GUNGAME_MSG_READY = GunGame Mode
 
 MAX_KILL_MSG = /- 目標擊殺數 %d -/
 TDM_KILL_MSG = 反恐精英 %d | %d 恐怖份子
 DM_KILL_MSG = 你的擊殺數 %d
 
 DM_TOPKILLER_MSG = Top Killer '%s' ^n共擊殺了 '%d' 位玩家
+
+DM_GUNGAME_MSG = GunGame Level:%d/%d 下一級需要殺 '%d'
 
 TR_WIN_MSG = !!恐怖份子 勝利!! ^n 下一張地圖為 [%s]
 CT_WIN_MSG = !!反恐精英 勝利!! ^n 下一張地圖為 [%s]
@@ -85,6 +97,12 @@ AGET_WEAP_MENU4 = 你上次的武器:
 
 PRI_WM_NAME = [DM:KD] 選擇你的主武器
 SEC_WM_NAME = [DM:KD] 選擇你的副武器
+
+GG_WM_MENU1 = [DM:KD] GunGame
+GG_WM_MENU2 = 按任意數字開始/復活
+GG_WM_MENU3A = Your Team Level: %d/%d
+GG_WM_MENU3B = Your Level: %d/%d
+GG_WM_MENU4 = This Level Weapon: %s
 
 MENU_BACK = 上一頁
 MENU_NEXT = 下一頁
