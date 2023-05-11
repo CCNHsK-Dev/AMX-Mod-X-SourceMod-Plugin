@@ -1,17 +1,21 @@
 # AMX Mod X / SourceMod Plug-in
 
-Working: N/A
+AMX Mod X & SourceMod Plug-in
 
-DeathMatch: Kill Duty - v3.2.0
- - Counter-Strike 1.6
+DeathMatch: Kill Duty
+ - Version: 3.2.0
+ - Counter-Strike 1.6 / AMX Mod X Plug-in
  - Download: https://ccnhsk-dev.blogspot.com/search/label/DMKD%20Download
+ - Support: Available
 
-DeathMatch: Kill Duty Source  - v3.2.0
- - Counter-Strike: Source
+DeathMatch: Kill Duty Source
+ - Version: 3.2.0
+ - Counter-Strike: Source / SourceMod Plug-in
  - Download: https://ccnhsk-dev.blogspot.com/search/label/DMKD-S%20Download
+ - Support: Bugs Fixed Only
 
 
-Other Back-UP:
+Other Old Back-UP [End of Support]:
 
 Lead 4 Dead
   - High Damage Player is Killer [9/7/2012]
