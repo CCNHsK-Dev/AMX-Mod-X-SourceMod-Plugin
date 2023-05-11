@@ -1,7 +1,7 @@
 
 /* 
 			DeathMatch: Kill Duty 3.3.0
-				1/5/2023 (Version: 3.3.0)
+				12/5/2023 (Version: 3.3.0)
 			
 					HsK-Dev Blog By CCN
 			
@@ -15,7 +15,7 @@
 #include <hamsandwich>
 
 #define PLUGIN	"Deathmatch: Kill Duty"
-#define VERSION	"3.3.0.15"
+#define VERSION	"3.3.0.16"
 #define AUTHOR	"HsK-Dev Blog By CCN"
 
 new const MAX_BPAMMO[] = { -1, 52, -1, 90, 1, 32, 1, 100, 90, 1, 120, 100, 100, 90, 90, 90, 100, 120,
@@ -469,125 +469,6 @@ public SaveSpawnPoint(id)
 	client_print(id, print_chat, "New Spawn Point : %.2f %.2f %.2f", origin[0], origin[1], origin[2]);
 }
 
-stock LoadBasePoint()
-{
-	g_newBaseSpawnCount[0] = 0;
-	g_newBaseSpawnCount[1] = 0;
-	
-	new cfgdir[32], mapname[32], filepath[100], linedata[64];
-	get_configsdir(cfgdir, charsmax(cfgdir));
-	get_mapname(mapname, charsmax(mapname));
-	formatex(filepath, charsmax(filepath), "%s/Dm_KD/spawn/%s_base.cfg", cfgdir, mapname);
-	if (file_exists(filepath))
-	{
-		new data[10][7], file = fopen(filepath,"rt");
-		while (file && !feof(file))
-		{
-			fgets(file, linedata, charsmax(linedata));
-
-			if(!linedata[0] || str_count(linedata,' ') < 2) continue;
-
-			parse(linedata,data[0],5,data[1],5,data[2],5,data[3],5,data[4],5,data[5],5,data[6],5);
-			new Float: origin[3], Float: angles[3];
-			origin[0] = str_to_float(data[1]);
-			origin[1] = str_to_float(data[2]);
-			origin[2] = str_to_float(data[3]);
-			angles[0] = str_to_float(data[4]);
-			angles[1] = str_to_float(data[5]);
-			angles[2] = str_to_float(data[6]);
-
-			new newspawnPoint;
-			if (str_to_num(data[0]) == 0)
-			{
-				newspawnPoint = engfunc(EngFunc_CreateNamedEntity,engfunc(EngFunc_AllocString,"info_player_start"));
-				set_pev(newspawnPoint,pev_classname, "info_player_start");
-				g_newBaseSpawnCount[0]++;
-			}
-			else
-			{
-				newspawnPoint = engfunc(EngFunc_CreateNamedEntity,engfunc(EngFunc_AllocString,"info_player_deathmatch"));
-				set_pev(newspawnPoint,pev_classname, "info_player_deathmatch");
-				g_newBaseSpawnCount[1]++;
-			}
-
-			set_pev(newspawnPoint, pev_origin, origin);
-			set_pev(newspawnPoint, pev_angles, angles);
-		}
-		if (file) fclose(file);
-	}
-}
-
-stock LoadSpawnPoint()
-{
-	g_spawnCount = 0;
-
-	new cfgdir[32], mapname[32], filepath[100], linedata[64];
-	get_configsdir(cfgdir, charsmax(cfgdir));
-	get_mapname(mapname, charsmax(mapname));
-	formatex(filepath, charsmax(filepath), "%s/Dm_KD/spawn/%s.cfg", cfgdir, mapname);
-
-	if (file_exists(filepath))
-	{
-		new data[10][6], file = fopen(filepath,"rt");
-		
-		while (file && !feof(file))
-		{
-			fgets(file, linedata, charsmax(linedata));
-
-			if(!linedata[0] || str_count(linedata,' ') < 2) continue;
-
-			parse(linedata,data[0],5,data[1],5,data[2],5,data[3],5,data[4],5,data[5],5);
-
-			g_spawnPoint[g_spawnCount][0] = str_to_float(data[0]);
-			g_spawnPoint[g_spawnCount][1] = str_to_float(data[1]);
-			g_spawnPoint[g_spawnCount][2] = str_to_float(data[2]);
-			
-			g_spawnAngles[g_spawnCount][0] = str_to_float(data[3]);
-			g_spawnAngles[g_spawnCount][1] = str_to_float(data[4]);
-			g_spawnAngles[g_spawnCount][2] = str_to_float(data[5]);
-			
-			g_spawnCount++;
-			if (g_spawnCount >= sizeof g_spawnPoint)
-				break;
-		}
-		if (file) fclose(file);
-	}
-
-	new entity, ctSpawnPoint, trSpawnPoint;
-	while ((entity = engfunc(EngFunc_FindEntityByString, entity, "classname", "info_player_start")))
-		ctSpawnPoint++;
-	while ((entity = engfunc(EngFunc_FindEntityByString, entity, "classname", "info_player_deathmatch")))
-		trSpawnPoint++;
-
-	if (ctSpawnPoint > 0 && ctSpawnPoint < 16)
-		addBaseSpawnPoint (ctSpawnPoint, 0, "info_player_start");
-
-	if (trSpawnPoint > 0 && trSpawnPoint < 16)
-		addBaseSpawnPoint (trSpawnPoint, 1, "info_player_deathmatch");
-
-	ctSpawnPoint -= g_newBaseSpawnCount[0];
-	trSpawnPoint -= g_newBaseSpawnCount[1];
-
-	server_print("==========================");
-	server_print("= [Deathmatch: Kill Duty]     ");
-	server_print("= MAP : %s", mapname);
-	server_print("= Load Spawn Point.....");
-	server_print("= Base CT Point: %d | TR Point: %d", ctSpawnPoint, trSpawnPoint);
-	server_print("= New  CT Point: %d | TR Point: %d", g_newBaseSpawnCount[0], g_newBaseSpawnCount[1]);
-	server_print("= Spawn Count Has %d", g_spawnCount);
-	server_print("==========================");
-	
-	if (g_spawnCount == 0)
-	{
-		server_print("%L", LANG_PLAYER, "DONT_FIND_SPAWNPOINT", mapname);
-		g_dmMode = MODE_TDM;
-		g_dm_randomSpawn = 0;
-	}
-
-	if (g_makeNewBaseSpawn)
-		server_cmd_and_check("sv_restart", 1);
-}
-
 public addBaseSpawnPoint (basePointCount, team, const classname[])
 {
 	new entity;
@@ -656,6 +537,163 @@ public addBaseSpawnPoint (basePointCount, team, const classname[])
 
 		fclose(file);
 		basePointCount++;
+	}
+}
+
+stock LoadSpawnPoint()
+{
+	g_spawnCount = 0;
+
+	new cfgdir[32], mapname[32], filepath[100], linedata[64];
+	get_configsdir(cfgdir, charsmax(cfgdir));
+	get_mapname(mapname, charsmax(mapname));
+	formatex(filepath, charsmax(filepath), "%s/Dm_KD/spawn/%s.cfg", cfgdir, mapname);
+
+	if (file_exists(filepath))
+	{
+		new data[10][6], file = fopen(filepath,"rt");
+		
+		while (file && !feof(file))
+		{
+			fgets(file, linedata, charsmax(linedata));
+
+			if(!linedata[0] || str_count(linedata,' ') < 2) continue;
+
+			parse(linedata,data[0],5,data[1],5,data[2],5,data[3],5,data[4],5,data[5],5);
+
+			g_spawnPoint[g_spawnCount][0] = str_to_float(data[0]);
+			g_spawnPoint[g_spawnCount][1] = str_to_float(data[1]);
+			g_spawnPoint[g_spawnCount][2] = str_to_float(data[2]);
+			
+			g_spawnAngles[g_spawnCount][0] = str_to_float(data[3]);
+			g_spawnAngles[g_spawnCount][1] = str_to_float(data[4]);
+			g_spawnAngles[g_spawnCount][2] = str_to_float(data[5]);
+			
+			g_spawnCount++;
+			if (g_spawnCount >= sizeof g_spawnPoint)
+				break;
+		}
+		if (file) fclose(file);
+	}
+
+	if (g_spawnCount <= 32)
+		LoadCSDMSpawn();
+
+	new entity, ctSpawnPoint, trSpawnPoint;
+	while ((entity = engfunc(EngFunc_FindEntityByString, entity, "classname", "info_player_start")))
+		ctSpawnPoint++;
+	while ((entity = engfunc(EngFunc_FindEntityByString, entity, "classname", "info_player_deathmatch")))
+		trSpawnPoint++;
+
+	if (ctSpawnPoint > 0 && ctSpawnPoint < 16)
+		addBaseSpawnPoint (ctSpawnPoint, 0, "info_player_start");
+
+	if (trSpawnPoint > 0 && trSpawnPoint < 16)
+		addBaseSpawnPoint (trSpawnPoint, 1, "info_player_deathmatch");
+
+	ctSpawnPoint -= g_newBaseSpawnCount[0];
+	trSpawnPoint -= g_newBaseSpawnCount[1];
+
+	server_print("==========================");
+	server_print("= [Deathmatch: Kill Duty]     ");
+	server_print("= MAP : %s", mapname);
+	server_print("= Load Spawn Point.....");
+	server_print("= Base CT Point: %d | TR Point: %d", ctSpawnPoint, trSpawnPoint);
+	server_print("= New  CT Point: %d | TR Point: %d", g_newBaseSpawnCount[0], g_newBaseSpawnCount[1]);
+	server_print("= Spawn Count Has %d", g_spawnCount);
+	server_print("==========================");
+	
+	if (g_spawnCount == 0)
+	{
+		server_print("%L", LANG_PLAYER, "DONT_FIND_SPAWNPOINT", mapname);
+		g_dmMode = MODE_TDM;
+		g_dm_randomSpawn = 0;
+	}
+
+	if (g_makeNewBaseSpawn)
+		server_cmd_and_check("sv_restart", 1);
+}
+
+stock LoadCSDMSpawn()
+{
+	// Check for CSDM spawns of the current map
+	new cfgdir[32], mapname[32], filepath[100], linedata[64]
+	get_configsdir(cfgdir, charsmax(cfgdir))
+	get_mapname(mapname, charsmax(mapname))
+	formatex(filepath, charsmax(filepath), "%s/csdm/%s.spawns.cfg", cfgdir, mapname)
+	
+	if (file_exists(filepath))
+	{
+		new csdmdata[10][6], file = fopen(filepath,"rt")
+		
+		while (file && !feof(file))
+		{
+			fgets(file, linedata, charsmax(linedata))
+			
+			// invalid spawn
+			if(!linedata[0] || str_count(linedata,' ') < 2) continue;
+			
+			// get spawn point data
+			parse(linedata,csdmdata[0],5,csdmdata[1],5,csdmdata[2],5,csdmdata[3],5,csdmdata[4],5,csdmdata[5],5,csdmdata[6],5,csdmdata[7],5,csdmdata[8],5,csdmdata[9],5)
+			
+			// origin
+			g_spawnPoint[g_spawnCount][0] = floatstr(csdmdata[0])
+			g_spawnPoint[g_spawnCount][1] = floatstr(csdmdata[1])
+			g_spawnPoint[g_spawnCount][2] = floatstr(csdmdata[2])
+			
+			// increase spawn count
+			g_spawnCount++
+			if (g_spawnCount >= sizeof g_spawnPoint) break;
+		}
+		if (file) fclose(file)
+	}
+}
+
+stock LoadBasePoint()
+{
+	g_newBaseSpawnCount[0] = 0;
+	g_newBaseSpawnCount[1] = 0;
+	
+	new cfgdir[32], mapname[32], filepath[100], linedata[64];
+	get_configsdir(cfgdir, charsmax(cfgdir));
+	get_mapname(mapname, charsmax(mapname));
+	formatex(filepath, charsmax(filepath), "%s/Dm_KD/spawn/%s_base.cfg", cfgdir, mapname);
+	if (file_exists(filepath))
+	{
+		new data[10][7], file = fopen(filepath,"rt");
+		while (file && !feof(file))
+		{
+			fgets(file, linedata, charsmax(linedata));
+
+			if(!linedata[0] || str_count(linedata,' ') < 2) continue;
+
+			parse(linedata,data[0],5,data[1],5,data[2],5,data[3],5,data[4],5,data[5],5,data[6],5);
+			new Float: origin[3], Float: angles[3];
+			origin[0] = str_to_float(data[1]);
+			origin[1] = str_to_float(data[2]);
+			origin[2] = str_to_float(data[3]);
+			angles[0] = str_to_float(data[4]);
+			angles[1] = str_to_float(data[5]);
+			angles[2] = str_to_float(data[6]);
+
+			new newspawnPoint;
+			if (str_to_num(data[0]) == 0)
+			{
+				newspawnPoint = engfunc(EngFunc_CreateNamedEntity,engfunc(EngFunc_AllocString,"info_player_start"));
+				set_pev(newspawnPoint,pev_classname, "info_player_start");
+				g_newBaseSpawnCount[0]++;
+			}
+			else
+			{
+				newspawnPoint = engfunc(EngFunc_CreateNamedEntity,engfunc(EngFunc_AllocString,"info_player_deathmatch"));
+				set_pev(newspawnPoint,pev_classname, "info_player_deathmatch");
+				g_newBaseSpawnCount[1]++;
+			}
+
+			set_pev(newspawnPoint, pev_origin, origin);
+			set_pev(newspawnPoint, pev_angles, angles);
+		}
+		if (file) fclose(file);
 	}
 }
 //==============
@@ -1695,38 +1733,19 @@ public dm_user_spawn(id)
 		fm_set_user_armor(id, 100);
 	}
 
-	fm_strip_user_weapons(id);
-
 	set_msg_block(get_user_msgid("HideWeapon"), BLOCK_SET);
 	set_msg_block(get_user_msgid("RoundTime"), BLOCK_SET);
 	set_task(0.05, "event_hud_reset", id);
 	m_deadSeeKiller[id] = -1;
 	m_setDeadFlagTime[id] = -1.0;
 
-	for (new i = 0; i < sizeof WEAPON_CLASSNAME; i++)
-		ExecuteHamB(Ham_GiveAmmo, id, BUY_AMMO[i], AMMO_TYPE[i], MAX_BPAMMO[i]);
-
 	if (g_gunGame)
 	{
-		if (g_gg_hasKnife)
-			fm_give_item(id, "weapon_knife");
-
-		new weaponid;
-		if (g_dmMode == MODE_TDM)
-		{
-			if (fm_get_user_team(id) == 2)
-				weaponid = g_ggweaponID[g_gg_CTLevel];
-			else
-				weaponid = g_ggweaponID[g_gg_TRLevel];
-		}
-		else 
-			weaponid = g_ggweaponID[m_gg_level[id]];
-
-		fm_give_item(id, WEAPON_CLASSNAME[weaponid]);
-		SetWeaponSilenced (id, weaponid);
+		GiveGunGameWeapon (id);
 		return;
 	}
 
+	fm_strip_user_weapons(id);
 	fm_give_item(id, "weapon_knife");
 	if (m_chosen_sec_weap[id] && m_sec_weaponid[id] != 0)
 	{
@@ -1753,6 +1772,37 @@ public dm_user_spawn(id)
 	if (g_giveGrenade[0]) fm_give_item(id, "weapon_hegrenade");
 	if (g_giveGrenade[1]) fm_give_item(id, "weapon_flashbang");
 	if (g_giveGrenade[2]) fm_give_item(id, "weapon_smokegrenade");
+
+	for (new i = 0; i < sizeof WEAPON_CLASSNAME; i++)
+		ExecuteHamB(Ham_GiveAmmo, id, BUY_AMMO[i], AMMO_TYPE[i], MAX_BPAMMO[i]);
+}
+
+public GiveGunGameWeapon (id)
+{
+	if (!g_gunGame)
+		return;
+
+	fm_strip_user_weapons(id);
+
+	if (g_gg_hasKnife)
+		fm_give_item(id, "weapon_knife");
+
+	new weaponid;
+	if (g_dmMode == MODE_TDM)
+	{
+		if (fm_get_user_team(id) == 2)
+			weaponid = g_ggweaponID[g_gg_CTLevel];
+		else
+			weaponid = g_ggweaponID[g_gg_TRLevel];
+	}
+	else 
+		weaponid = g_ggweaponID[m_gg_level[id]];
+
+	fm_give_item(id, WEAPON_CLASSNAME[weaponid]);
+	SetWeaponSilenced (id, weaponid);
+
+	for (new i = 0; i < sizeof WEAPON_CLASSNAME; i++)
+		ExecuteHamB(Ham_GiveAmmo, id, BUY_AMMO[i], AMMO_TYPE[i], MAX_BPAMMO[i]);
 }
 
 public SetWeaponSilenced (id, weaponid)
@@ -1836,6 +1886,7 @@ public RoundCountDown ()
 			m_setDeadFlagTime[id] = -1.0;
 			m_deadSeeKiller[id] = -1;
 
+			GiveGunGameWeapon (id);
 			dm_setSpawnPoint (id);
 			m_spawnGodTime[id] = gameTime + 2.5;
 		}
@@ -1859,32 +1910,23 @@ public dm_setSpawnPoint (id)
 
 	if (!g_dm_randomSpawn)
 		return;
-	
-	new spawnPoint = -1, checkTime = 0;
-	while (spawnPoint == -1)
+
+	new spawnPoint = random_num(0, g_spawnCount - 1), checkTime = 0;
+	while (spawnPoint != -1)
 	{
-		if (checkTime > g_spawnCount)
+		if (spawnPoint >= g_spawnCount)
+			spawnPoint = 0;
+		
+		if (checkSpawnPointWorking(id, g_spawnPoint[spawnPoint]))
 			break;
-		
+
+		spawnPoint++;
 		checkTime++;
-		spawnPoint = random_num(0, g_spawnCount - 1);
-		
-		if (!checkSpawnPointWorking(id, g_spawnPoint[spawnPoint]))
-			spawnPoint = -1;
-		else
+
+		if (checkTime >= g_spawnCount)
 		{
-			new otherEntity = -1;
-			while((otherEntity = engfunc(EngFunc_FindEntityInSphere,otherEntity,g_spawnPoint[spawnPoint],360.0))) 
-			{
-				if (!pev_valid(otherEntity) || otherEntity == id)
-					continue
-					
-				if (is_user_alive (otherEntity))
-				{
-					spawnPoint = -1;
-					break;
-				}
-			}
+			spawnPoint = -1;
+			break;
 		}
 	}
 
@@ -2024,7 +2066,7 @@ public CheckGunGameLevelUP ()
 				if (!is_user_connected (id) || !is_user_alive (id) || fm_get_user_team (id) != 2)
 					continue;
 					
-				dm_user_spawn (id);
+				GiveGunGameWeapon (id);
 				client_cmd(id, "spk ^"events/friend_died.wav^"");
 			}
 		}
@@ -2039,7 +2081,7 @@ public CheckGunGameLevelUP ()
 				if (!is_user_connected (id) || !is_user_alive (id) || fm_get_user_team (id) != 1)
 					continue;
 					
-				dm_user_spawn (id);
+				GiveGunGameWeapon (id);
 				client_cmd(id, "spk ^"events/friend_died.wav^"");
 			}
 		}
@@ -2062,7 +2104,7 @@ public CheckGunGameLevelUP ()
 		m_gg_kill[id] = 0;
 
 		if (is_user_alive(id))
-			dm_user_spawn (id);
+			GiveGunGameWeapon (id);
 
 		client_cmd(id, "spk ^"events/friend_died.wav^"");
 	}
