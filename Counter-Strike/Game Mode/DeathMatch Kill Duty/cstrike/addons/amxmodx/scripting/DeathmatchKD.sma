@@ -1,7 +1,7 @@
 
 /* 
 			DeathMatch: Kill Duty 3.3.0
-				12/5/2023 (Version: 3.3.0)
+				29/5/2023 (Version: 3.3.0)
 			
 					HsK-Dev Blog By CCN
 			
@@ -15,7 +15,7 @@
 #include <hamsandwich>
 
 #define PLUGIN	"Deathmatch: Kill Duty"
-#define VERSION	"3.3.0.16"
+#define VERSION	"3.3.0.17"
 #define AUTHOR	"HsK-Dev Blog By CCN"
 
 new const MAX_BPAMMO[] = { -1, 52, -1, 90, 1, 32, 1, 100, 90, 1, 120, 100, 100, 90, 90, 90, 100, 120,
@@ -1782,12 +1782,7 @@ public GiveGunGameWeapon (id)
 	if (!g_gunGame)
 		return;
 
-	fm_strip_user_weapons(id);
-
-	if (g_gg_hasKnife)
-		fm_give_item(id, "weapon_knife");
-
-	new weaponid;
+	static weaponid;
 	if (g_dmMode == MODE_TDM)
 	{
 		if (fm_get_user_team(id) == 2)
@@ -1797,6 +1792,30 @@ public GiveGunGameWeapon (id)
 	}
 	else 
 		weaponid = g_ggweaponID[m_gg_level[id]];
+
+	new bool:dontNeedGiveWeapon = false;
+	new weapons[32], num, i;
+	get_user_weapons(id, weapons, num);
+
+	for (i = 0; i < num; i++)
+	{
+		if (!g_gg_hasKnife && ((1<<weapons[i]) & (1<<CSW_KNIFE)))
+		{
+			dontNeedGiveWeapon = false;
+			break;
+		}
+
+		if (weapons[i] == weaponid)
+			dontNeedGiveWeapon = true;
+	}
+
+	if (dontNeedGiveWeapon)
+		return;
+
+	fm_strip_user_weapons(id);
+
+	if (g_gg_hasKnife)
+		fm_give_item(id, "weapon_knife");
 
 	fm_give_item(id, WEAPON_CLASSNAME[weaponid]);
 	SetWeaponSilenced (id, weaponid);
