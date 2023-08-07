@@ -1,7 +1,7 @@
 
 /* 
 			DeathMatch: Kill Duty 3.3.0
-				29/5/2023 (Version: 3.3.0)
+				8/8/2023 (Version: 3.3.0)
 			
 					HsK-Dev Blog By CCN
 			
@@ -15,7 +15,7 @@
 #include <hamsandwich>
 
 #define PLUGIN	"Deathmatch: Kill Duty"
-#define VERSION	"3.3.0.17"
+#define VERSION	"3.3.0.18"
 #define AUTHOR	"HsK-Dev Blog By CCN"
 
 new const MAX_BPAMMO[] = { -1, 52, -1, 90, 1, 32, 1, 100, 90, 1, 120, 100, 100, 90, 90, 90, 100, 120,
@@ -69,6 +69,9 @@ const ACCESS_FLAG = ADMIN_BAN;
 
 #define MODE_TDM                0
 #define MODE_DM                 1
+
+// Game Base
+new g_serName[64], g_gameName[64];
 
 // Game vars
 new g_dmMode = MODE_TDM; // DM MoD
@@ -150,7 +153,7 @@ new Float:m_spawnGodTime[33]; // Spawn God Time
 new Float:m_buyzoneTime[33]; // Get Player in Buyzone Time
 
 // Message IDs vars
-new g_msgHideWeapon, g_msgCrosshair, g_msgSync, g_msgStatusText, g_magStatusValue;
+new g_msgHostname, g_msgServerName, g_msgHideWeapon, g_msgCrosshair, g_msgSync, g_msgStatusText, g_magStatusValue;
 
 // Ham Z-Bot
 new cvar_botquota, g_hamczbots;
@@ -191,6 +194,8 @@ public plugin_init()
 	register_clcmd("say /dm_set", "dm_adminSettingMenu");
 
 	//MSG
+	g_msgHostname = get_cvar_pointer("hostname");
+	g_msgServerName = get_user_msgid("ServerName");
 	g_msgHideWeapon = get_user_msgid("HideWeapon");
 	g_msgCrosshair = get_user_msgid("Crosshair");
 	g_msgStatusText = get_user_msgid("StatusText");
@@ -223,9 +228,12 @@ public plugin_precache()
 	LoadBasePoint ();
 }
 
-// DM:KD Setting Loading =========
+// DM:KD Base Setting Loading =========
 LoadDMKDSetting ()
 {
+	format (g_serName, 63, "0");
+	format (g_gameName, 63, "0");
+
 	g_botBestWeapon[0][0] = -1; g_botBestWeapon[0][1] = -1; g_botBestWeapon[0][2] = -1;
 	g_botBestWeapon[1][0] = -1; g_botBestWeapon[1][1] = -1; g_botBestWeapon[1][2] = -1;
 	
@@ -307,6 +315,7 @@ LoadDMKDSetting ()
 
 	GetGameMap();
 	LoadSpawnPoint();
+	SetGameName();
 	DM_BaseGameSetting();
 }
 
@@ -344,7 +353,11 @@ LoadDMSettingFile()
 				trim(key);
 				trim(value);
 
-				if (equal(key, "DM MoD"))
+				if (equal(key, "Server Name"))
+					format (g_serName, 63, value);
+				else if (equal(key, "Game Name"))
+					format (g_gameName, 63, value);
+				else if (equal(key, "DM MoD"))
 				{
 					g_dmMode = str_to_num(value);
 					
@@ -440,6 +453,30 @@ LoadDMSettingFile()
 	}
 	if (file) fclose(file)
 }
+
+SetGameName()
+{
+	if (g_serName[0] && g_serName[0] != '0')
+	{
+		message_begin(MSG_BROADCAST, g_msgServerName);
+		write_string(g_serName);
+		message_end();
+		set_pcvar_string(g_msgHostname, g_serName);
+	}
+
+	if (g_gameName[0] && g_gameName[0] != '0')
+		register_forward(FM_GetGameDescription, "fw_GetGameDescription");
+}
+
+public fw_GetGameDescription() 
+{
+	if (g_gameName[0] == '1')
+		forward_return(FMV_STRING, (g_dmMode != MODE_TDM) ? "[DM]DeathMatch: Kill Duty" : "[TDM]DeathMatch: Kill Duty");
+	else
+		forward_return(FMV_STRING, g_gameName);
+
+	return FMRES_SUPERCEDE;
+}  
 
 // Random Spawns ============================
 public SaveSpawnPoint(id)
@@ -797,7 +834,6 @@ public DM_BaseGameSetting()
 	
 	SetBotMode (dm_game_play ());
 }
-
 //==========================
 
 // Block Map Mission ==========
@@ -918,6 +954,7 @@ public logevent_round_start()
 	g_winIndex = -1;
 	
 	SetBotMode (dm_game_play ());
+	SetGameName ();
 }
 // =====================
 
