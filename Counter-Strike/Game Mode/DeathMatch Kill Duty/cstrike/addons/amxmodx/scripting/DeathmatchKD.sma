@@ -15,7 +15,7 @@
 #include <hamsandwich>
 
 #define PLUGIN	"Deathmatch: Kill Duty"
-#define VERSION	"3.3.0.18"
+#define VERSION	"3.3.0.19"
 #define AUTHOR	"HsK-Dev Blog By CCN"
 
 new const MAX_BPAMMO[] = { -1, 52, -1, 90, 1, 32, 1, 100, 90, 1, 120, 100, 100, 90, 90, 90, 100, 120,
@@ -72,6 +72,7 @@ const ACCESS_FLAG = ADMIN_BAN;
 
 // Game Base
 new g_serName[64], g_gameName[64];
+new g_showGameModeOnSerName;
 
 // Game vars
 new g_dmMode = MODE_TDM; // DM MoD
@@ -232,6 +233,7 @@ public plugin_precache()
 LoadDMKDSetting ()
 {
 	format (g_serName, 63, "0");
+	g_showGameModeOnSerName = 0;
 	format (g_gameName, 63, "0");
 
 	g_botBestWeapon[0][0] = -1; g_botBestWeapon[0][1] = -1; g_botBestWeapon[0][2] = -1;
@@ -355,6 +357,8 @@ LoadDMSettingFile()
 
 				if (equal(key, "Server Name"))
 					format (g_serName, 63, value);
+				else if (equal(key, "Show Game Mode on Server Name"))
+					g_showGameModeOnSerName = str_to_num(value);
 				else if (equal(key, "Game Name"))
 					format (g_gameName, 63, value);
 				else if (equal(key, "DM MoD"))
@@ -458,10 +462,17 @@ SetGameName()
 {
 	if (g_serName[0] && g_serName[0] != '0')
 	{
+		new serverName[64];
+		if (g_showGameModeOnSerName)
+			formatex(serverName, 63, "%s [Mode: %s%s]", g_serName, 
+			(g_gunGame) ? "GunGame|" : "", (g_dmMode == MODE_DM) ? "DM" : "TDM");
+		else
+			format (serverName, 63, g_serName);
+
 		message_begin(MSG_BROADCAST, g_msgServerName);
-		write_string(g_serName);
+		write_string(serverName);
 		message_end();
-		set_pcvar_string(g_msgHostname, g_serName);
+		set_pcvar_string(g_msgHostname, serverName);
 	}
 
 	if (g_gameName[0] && g_gameName[0] != '0')
@@ -471,7 +482,11 @@ SetGameName()
 public fw_GetGameDescription() 
 {
 	if (g_gameName[0] == '1')
-		forward_return(FMV_STRING, (g_dmMode != MODE_TDM) ? "[DM]DeathMatch: Kill Duty" : "[TDM]DeathMatch: Kill Duty");
+	{
+		new gameName[64];
+		formatex(gameName, 63, "[%s%s] DeathMatch", (g_gunGame) ? "GG|" : "", (g_dmMode == MODE_DM) ? "DM" : "TDM");
+		forward_return(FMV_STRING, gameName);
+	}
 	else
 		forward_return(FMV_STRING, g_gameName);
 
