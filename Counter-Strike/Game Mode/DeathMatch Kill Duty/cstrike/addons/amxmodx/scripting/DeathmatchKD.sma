@@ -15,7 +15,7 @@
 #include <hamsandwich>
 
 #define PLUGIN	"Deathmatch: Kill Duty"
-#define VERSION	"3.3.0.19"
+#define VERSION	"3.3.0.20"
 #define AUTHOR	"HsK-Dev Blog By CCN"
 
 new const MAX_BPAMMO[] = { -1, 52, -1, 90, 1, 32, 1, 100, 90, 1, 120, 100, 100, 90, 90, 90, 100, 120,
@@ -1087,12 +1087,7 @@ public fw_PlayerKilled(victim, attacker, shouldgib)
 	m_killMSGIndex[victim][1] = 0;
 	m_showKillMSGTime[victim] = gameTime + g_spawnTime;
 	m_showHudMsgTime[victim] = gameTime;
-		
-	m_killMSGIndex[attacker][0] = victim;
-	m_killMSGIndex[attacker][1] = 1;
-	m_showKillMSGTime[attacker] = gameTime + 4.0;
-	m_showHudMsgTime[attacker] = gameTime;
-	
+			
 	static weapon, hitzone;
 	get_user_attacker(victim, weapon, hitzone);
 
@@ -1112,6 +1107,11 @@ public fw_PlayerKilled(victim, attacker, shouldgib)
 
 		return HAM_SUPERCEDE;
 	}
+
+	m_killMSGIndex[attacker][0] = victim;
+	m_killMSGIndex[attacker][1] = 1;
+	m_showKillMSGTime[attacker] = gameTime + 4.0;
+	m_showHudMsgTime[attacker] = gameTime;
 
 	m_deadSeeKiller[victim] = attacker;
 	m_deadSeeKillerTime[victim][0] = gameTime + 0.5;
