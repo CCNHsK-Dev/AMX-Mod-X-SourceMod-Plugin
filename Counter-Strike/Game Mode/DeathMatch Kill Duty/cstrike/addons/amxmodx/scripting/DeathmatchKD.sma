@@ -1,7 +1,7 @@
 
 /* 
 			DeathMatch: Kill Duty 3.3.0
-				8/8/2023 (Version: 3.3.0)
+				5/5/2024 (Version: 3.3.0)
 			
 					HsK-Dev Blog By CCN
 			
@@ -15,7 +15,7 @@
 #include <hamsandwich>
 
 #define PLUGIN	"Deathmatch: Kill Duty"
-#define VERSION	"3.3.0.20"
+#define VERSION	"3.3.0.21"
 #define AUTHOR	"HsK-Dev Blog By CCN"
 
 new const MAX_BPAMMO[] = { -1, 52, -1, 90, 1, 32, 1, 100, 90, 1, 120, 100, 100, 90, 90, 90, 100, 120,
@@ -1196,16 +1196,13 @@ public fw_TakeDamage(victim, inflictor, attacker, Float:damage, damage_type)
 	if (g_dmMode == MODE_DM)
 	{
 		new const victimTeam = fm_get_user_team(victim);
-		new const attackTeam = fm_get_user_team(attacker);
+		new const attackTeam = (is_user_connected (attacker)) ? fm_get_user_team(attacker) : victimTeam;
 
 		if (victimTeam != attackTeam)
 			return HAM_IGNORED;
-
+			
 		m_dmdamage[victim] = true;
-		if (victimTeam == 1)
-			fm_set_user_team(victim, 2);
-		else if (victimTeam == 2)
-			fm_set_user_team(victim, 1);
+		fm_set_user_team(victim, victimTeam == 1 ? 2 : 1);
 	}
 
 	return HAM_IGNORED;
@@ -1216,9 +1213,8 @@ public fw_TakeDamage_Post(victim)
 	if (!m_dmdamage[victim])
 		return;
 
-	new Vteam = fm_get_user_team(victim);
-	if (Vteam == 1) fm_set_user_team(victim, 2);
-	else if (Vteam == 2) fm_set_user_team(victim, 1);
+	new const victimTeam = fm_get_user_team(victim);
+	fm_set_user_team(victim, victimTeam == 1 ? 2 : 1);
 
 	m_dmdamage[victim] = false;
 }
@@ -2294,7 +2290,7 @@ stock dm_force_team_join(id, menu_msgid, team[] = "5", class[] = "5")
 // ==============
 
 // MSG Hook =========
-public client_disconnect (id)
+public client_disconnected (id)
 {
 	playerDataReset (id, false);
 }
@@ -2540,14 +2536,17 @@ SendDeathMsg(attacker, victim, const weapon[], hs)
 	write_byte(hs); // headshot flag
 	write_string(weapon); // killer's weapon
 	message_end();
-
-	message_begin(MSG_BROADCAST, get_user_msgid("ScoreInfo"));
-	write_byte(attacker); // id
-	write_short(pev(attacker, pev_frags)); // frags
-	write_short(get_pdata_int(attacker, 444));
-	write_short(0); // class?
-	write_short(fm_get_user_team(attacker)); // team
-	message_end();  
+	
+	if (is_user_connected (attacker))
+	{
+		message_begin(MSG_BROADCAST, get_user_msgid("ScoreInfo"));
+		write_byte(attacker); // id
+		write_short(pev(attacker, pev_frags)); // frags
+		write_short(get_pdata_int(attacker, 444));
+		write_short(0); // class?
+		write_short(fm_get_user_team(attacker)); // team
+		message_end();  
+	}
 
 	message_begin(MSG_BROADCAST, get_user_msgid("ScoreInfo"));
 	write_byte(victim); // id

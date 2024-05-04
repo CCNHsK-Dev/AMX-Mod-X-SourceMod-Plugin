@@ -7,7 +7,7 @@ DeathMatch Plug-in for Counter-Strike
 Need:
  - Counter-Strike 1.6
  - AMX Mod X
-
+ 
 _____________________________
 DeathMatch: Kill Duty 3.2.0
 Version: 3.2.0 (7/3/2023)
