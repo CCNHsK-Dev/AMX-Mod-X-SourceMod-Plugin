@@ -3,10 +3,10 @@
 AMX Mod X & SourceMod Plug-in
 
 DeathMatch: Kill Duty
- - Version: 3.2.0
+ - Version: 3.3.0
  - Counter-Strike 1.6 / AMX Mod X Plug-in
  - Download: https://ccnhsk-dev.blogspot.com/search/label/DMKD%20Download
- - Support: Available
+ - Support: Bugs Fixed Only
 
 DeathMatch: Kill Duty Source
  - Version: 3.2.0

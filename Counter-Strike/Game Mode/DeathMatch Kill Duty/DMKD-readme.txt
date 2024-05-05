@@ -9,6 +9,22 @@ Need:
  - AMX Mod X
  
 _____________________________
+DeathMatch: Kill Duty 3.3.0
+Version: 3.3.0 (5/5/2024)
+ - Support AMXX 1.90
+ - Add GunGame Mode (Support DM/TDM)
+ - Unlock Map Player Limit (All Map Support 16v16 now)
+ - TDM Support Random Spawn Point
+ - Support CSDM Random Spawn Point
+ - Add Set Server Name & Game Name Now
+ - Choose Weapon Menu improve
+ - Text MSG improve
+ - Death Msg improve / fixed
+ - Auto Support YaPB/EBot Now
+ - Don't Show Team Money & HP (DM Mode) on Tab MSG
+ - Base improve / Debug
+
+_____________________________
 DeathMatch: Kill Duty 3.2.0
 Version: 3.2.0 (7/3/2023)
  - Add DM Mode HeadShot/Knife Kill Add HP

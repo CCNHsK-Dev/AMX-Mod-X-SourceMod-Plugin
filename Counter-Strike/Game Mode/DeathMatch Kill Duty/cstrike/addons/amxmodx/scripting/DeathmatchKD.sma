@@ -15,7 +15,7 @@
 #include <hamsandwich>
 
 #define PLUGIN	"Deathmatch: Kill Duty"
-#define VERSION	"3.3.0.21"
+#define VERSION	"3.3.0.22"
 #define AUTHOR	"HsK-Dev Blog By CCN"
 
 new const MAX_BPAMMO[] = { -1, 52, -1, 90, 1, 32, 1, 100, 90, 1, 120, 100, 100, 90, 90, 90, 100, 120,
@@ -513,11 +513,8 @@ public SaveSpawnPoint(id)
 	fclose(file);
 
 	dm_adminSettingMenu (id);
-
-	server_print("==========================");
-	server_print("= [Deathmatch: Kill Duty]     ");
-	server_print("= Save New Spawn Point");
-	server_print("==========================");
+	
+	server_print ("[DM:KD] Save New Spawn Point");
 	client_print(id, print_chat, "New Spawn Point : %.2f %.2f %.2f", origin[0], origin[1], origin[2]);
 }
 
@@ -649,7 +646,6 @@ stock LoadSpawnPoint()
 	server_print("==========================");
 	server_print("= [Deathmatch: Kill Duty]     ");
 	server_print("= MAP : %s", mapname);
-	server_print("= Load Spawn Point.....");
 	server_print("= Base CT Point: %d | TR Point: %d", ctSpawnPoint, trSpawnPoint);
 	server_print("= New  CT Point: %d | TR Point: %d", g_newBaseSpawnCount[0], g_newBaseSpawnCount[1]);
 	server_print("= Spawn Count Has %d", g_spawnCount);
@@ -663,7 +659,10 @@ stock LoadSpawnPoint()
 	}
 
 	if (g_makeNewBaseSpawn)
+	{
+		server_print("[DM:KD] [%s] Add Base Point, Server Restart Now", mapname);
 		server_cmd_and_check("sv_restart", 1);
+	}
 }
 
 stock LoadCSDMSpawn()
